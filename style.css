@@ -185,6 +185,11 @@ summary {
   color: var(--muted);
 }
 
+.authors strong {
+  color: var(--text);
+  font-weight: 800;
+}
+
 .venue {
   margin-bottom: 2px;
   color: var(--accent-2);
