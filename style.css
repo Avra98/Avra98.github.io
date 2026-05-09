@@ -197,6 +197,10 @@ summary {
   font-size: 0.94rem;
 }
 
+.paper-links a {
+  font-weight: 700;
+}
+
 .topic {
   margin-top: 34px;
   color: var(--accent-2);
