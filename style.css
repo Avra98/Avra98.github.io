@@ -185,9 +185,9 @@ summary {
   color: var(--muted);
 }
 
-.authors strong {
-  color: var(--text);
-  font-weight: 800;
+.authors .me {
+  color: #ffffff;
+  font-weight: 900;
 }
 
 .venue {
