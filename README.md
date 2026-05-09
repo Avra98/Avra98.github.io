@@ -1,12 +1,12 @@
 # Avrajit Ghosh Academic Homepage
 
-This is a plain HTML/CSS GitHub Pages homepage inspired by clean academic sites such as Jingfeng Wu's homepage.
+This is a plain HTML/CSS GitHub Pages homepage.
 
 ## Local Edits
 
 - Edit `index.html` for text, publications, links, and news.
 - Edit `style.css` for colors, spacing, fonts, and layout.
-- Put your photo at `assets/profile.jpg`.
+- Put your photo at `assets/profile.png`.
 - Put your CV at `assets/Avrajit_Ghosh_CV.pdf`.
 
 ## Publish
