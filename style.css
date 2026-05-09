@@ -186,8 +186,9 @@ summary {
 }
 
 .authors .me {
-  color: #ffffff;
-  font-weight: 900;
+  color: #ffffff !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.01em;
 }
 
 .venue {
