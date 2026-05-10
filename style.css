@@ -182,6 +182,7 @@ summary {
 .talk-date {
   display: inline-block;
   min-width: 110px;
+  margin-right: 14px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
