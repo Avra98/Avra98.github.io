@@ -175,13 +175,13 @@ summary {
 }
 
 .talks li {
-  margin: 10px 0;
+  margin: 6px 0;
   color: var(--text);
 }
 
 .talk-date {
   display: inline-block;
-  min-width: 86px;
+  min-width: 110px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
