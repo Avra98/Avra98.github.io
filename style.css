@@ -169,6 +169,42 @@ summary {
   font-variant-numeric: tabular-nums;
 }
 
+.talks {
+  margin: 0;
+  padding-left: 22px;
+}
+
+.talks li {
+  margin: 10px 0;
+  color: var(--text);
+}
+
+.talk-date {
+  display: inline-block;
+  min-width: 86px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.talks strong {
+  color: var(--text);
+}
+
+.talks em {
+  display: block;
+  margin-left: 86px;
+  color: var(--accent-2);
+  font-style: normal;
+  font-weight: 650;
+}
+
+.talk-note {
+  display: block;
+  margin-left: 86px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
 .paper {
   margin: 16px 0 18px;
   padding-left: 16px;
