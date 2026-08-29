@@ -73,7 +73,7 @@ footer{margin-top:22px;padding-top:14px;border-top:1px solid var(--line);
   <p class="eyebrow">Walkthrough on the edge of stochastic stability of neural networks.</p>
   <h1>Dynamics of SGD at the edge of Lyapunov stability.</h1>
 
-  <h2>1 Classical SGD update. </h2>
+  <h2>1 · Classical SGD update.</h2>
   <div class="eq">\[ \theta_{t+1}=\theta_t-h\,\nabla L_{B_t}(\theta_t) \]</div>
   <p>At every iteration, SGD updates the iterate with an unbiased estimate of the gradient. The type of SGD is only the batch-sampling rule: online SGD uses one example; minibatch SGD uses \(B\) examples, drawn with or without replacement. For simplicity, let's just consider the sample batches are drawn i.i.d.</p>
 
@@ -81,7 +81,7 @@ footer{margin-top:22px;padding-top:14px;border-top:1px solid var(--line);
 
   <p>The dynamics of SGD are classical under Lipschitz assumptions, yet that theory does not predict what we see in deep networks. This tutorial recaps the quadratic picture, lists the observations it cannot explain, and then turns to scalar and high-dimensional models that do match the practical behaviour.</p>
 
-  <h2>2 · SGD on a quadratic loss.</h2>
+  <h2>3 · SGD on a quadratic loss.</h2>
   <p>Start with one coordinate and a quadratic loss whose curvature \(a_t\) is redrawn i.i.d. each step:</p>
   <div class="eq">\[ L_t(x)=\tfrac12\,a_t\,x^2,\qquad a_t\sim\mathrm{i.i.d.} \]</div>
   <p>Writing the SGD update step with additive Gaussian noise:</p>
@@ -107,7 +107,7 @@ footer{margin-top:22px;padding-top:14px;border-top:1px solid var(--line);
 
   <p>This seems quite convincing and seems to give a full picture.</p>
  
-  <h2>3 · The gap in prediction using exact quadratics</h2>
+  <h2>4 · The gap in prediction using exact quadratics</h2>
   <p>Training an MLP on CIFAR-10 with SGD at the edge of stochastic stability, we freeze a late checkpoint \(\theta_\star\), take the top Hessian eigenvector \(u_1\), and continue from there. The loss has already collapsed. In a late tracking window the occupancy of \(\langle\theta-\theta_\star,u_1\rangle\) is still two lobes with a gap at the checkpoint.</p>
 
   <figure>
@@ -123,7 +123,7 @@ footer{margin-top:22px;padding-top:14px;border-top:1px solid var(--line);
   <p>So the linear part really is expanding, and something outside the linear part is holding the iterate in. As you can already guess, the exact quadratic picture is flawed here: the natural next step is to ask whether a higher-order polynomial approximation of the loss can predict these dynamics.</p>
   <p>We now turn to three labs that build that missing piece — first as a scalar nonlinearity, then as a matrix effect, then back on the network.</p>
 
-  <h2>4 · The harmonic instability edge.</h2>
+  <h2>5 · The harmonic instability edge.</h2>
   <p>Keeping the same scalar update. Only the loss changes: replace the quadratic by a quartic, so the step picks up restoring terms.</p>
   <div class="eq">\[ x_{t+1}=(1-h a_t)\,x_t+\alpha x_t^3-\beta x_t^5+\sigma\xi_t \]</div>
   <p>Near zero this is still the Kesten map \(A_tx_t+\sigma\xi_t\). Once the iterate is pushed out, the higher terms pull it back, so an expanding linear multiplier no longer means escape. Raise \(h\) past the Lyapunov edge and the same path that used to diverge settles into two lobes.</p>
@@ -139,19 +139,19 @@ footer{margin-top:22px;padding-top:14px;border-top:1px solid var(--line);
     <figcaption>Left to right, growing step size \(h\). Spike at \(0\), then a tent after Lyapunov, then two wells past the harmonic instability edge \(h_H\). Only \(h\) changes.</figcaption>
   </figure>
 
-  <h2>5 · High-dimensional linear regression.</h2>
+  <h2>6 · High-dimensional linear regression.</h2>
   <p>We extend the toy setup to 2-dimensional linear regression where the batch samples are drawn i.i.d from a Gaussian distribution. Each step picks a minibatch \(\mathcal B_t\) of size \(B\) and forms the batch Hessian from those covariates. We add an isotropic self-stabilization coefficient to observe the iterate dynamics in the post-Lyapunov regime. Note that since the Gaussian covariates are drawn i.i.d, the linear matrix product are non-commutative and hence a non-trivial extension of the scalar case above. </p>
   <div class="eq">\[ x_{t+1}=(I-h H_t)\,x_t-h\Big(\tfrac{c_{4,t}}{6}\|x_t\|^2+\tfrac{c_{6,t}}{120}\|x_t\|^4\Big)x_t+\sigma\xi_t,\qquad H_t=\frac1B\sum_{i\in\mathcal B_t}z_i z_i^\top,\quad z_i\sim\mathcal N(0,\Sigma),\quad \Sigma=\mathrm{diag}(\mu_1,\mu_2) \]</div>
   <p>In the diagram below, we plot iterate histogram distribution of the cooridnates x1 and x2.  </p>
   <p class="tiny">Pick a batch preset, hit <b>Run</b>, compare the two stability readouts. <a href="sgd-2d-matrix-cocycle_stochastc_selfstable.html" target="_blank">Open this lab alone</a>.</p>
   <iframe class="frame" title="Matrix cocycle lab" src="sgd-2d-matrix-cocycle_stochastc_selfstable.html?embed=1&v=5"></iframe>
 
-  <h2>6 · Back to the network.</h2>
+  <h2>7 · Back to the network.</h2>
   <p>Now let’s see the dynamics of SGD. We train several neural networks to completion. Then, using a different batch size and step size, we run SGD iterations from those trained checkpoints and plot the iterate histogram in the top two Hessian eigenvector directions.</p>
   <p class="tiny">Choose a checkpoint pack, sweep step size or batch, then run. <a href="SHARE-nn-checkpoint-cocycle.html" target="_blank">Open this lab alone</a>.</p>
   <iframe class="frame" title="NN checkpoint lab" src="SHARE-nn-checkpoint-cocycle.html?embed=1&v=3"></iframe>
 
-  <h2>7 · Conclusion.</h2>
+  <h2>8 · Conclusion.</h2>
   <p>Full-batch GD on a quadratic has a single threshold where it converges or it diverges. SGD on the same quadratic has a tail spectrum that depends on the step-size and batch distribution. Self-stabilized SGD on a nonlinear loss does something new. After the Lyapunov edge the iterate stays bounded, and a new spectrum appears, organized by the negative-moment root \(\alpha\): a <b>central peak</b> while \(0&lt;\alpha&lt;1\), then <b>central depletion</b> once that root crosses \(\alpha=1\). That last crossing is the modal-split edge — the origin empties and, under the usual extra assumptions, the cloud becomes two lobes.</p>
 
   <figure>
