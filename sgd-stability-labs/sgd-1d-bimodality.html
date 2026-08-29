@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1-D SGD · iterate shape beyond stochastic stability</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root{
+    --bg:#f7f6f2; --surface:#fffcf7; --ink:#141311; --ink2:#4a4843; --muted:#7a776f;
+    --grid:#e4e1d8; --axis:#c8c4b8; --border:rgba(20,19,17,.12);
+    --accent:#1f6fd2; --ms:#1f6fd2; --lyap:#c98500; --harm:#c23b3b; --det:#0a7a2f;
+    --chipbg:rgba(20,19,17,.05); --good:#0a7a2f; --warn:#c98500; --crit:#c23b3b; --now:#d45a1a;
+    --tip:#eef5ff; --tipborder:#c7daf5;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#10100f; --surface:#1a1a18; --ink:#f4f2ea; --ink2:#c4c1b6; --muted:#8d8a80;
+      --grid:#2c2b27; --axis:#3a3933; --border:rgba(255,255,255,.10);
+      --accent:#4d8fe8; --ms:#4d8fe8; --lyap:#e0a53a; --harm:#e06666; --det:#3aa85a;
+      --chipbg:rgba(255,255,255,.06); --tip:#182433; --tipborder:#2a4668;
+    }
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg); color:var(--ink);
+    font:15px/1.55 "Source Serif 4", Georgia, "Times New Roman", serif; margin:0; padding:0 18px 72px;}
+  .sans, button, input, select, label, .chip, .pill, .eyebrow, .cap, .row label, .presets, .legend, .ttl, .param-readout, .knob-h {
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;}
+  .mono, code, .num{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+  header{max-width:1180px; margin:28px auto 18px;}
+  .eyebrow{font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin:0 0 8px}
+  h1{font-size:28px; line-height:1.2; margin:0; font-weight:650; letter-spacing:-.02em}
+  h1 .sub{display:block; margin-top:6px; font-size:16px; font-weight:400; color:var(--ink2)}
+  .hero-eq{margin:18px 0 10px; padding:14px 16px; background:var(--surface);
+    border:1px solid var(--border); border-radius:14px; overflow-x:auto;}
+  .lede{max-width:85ch; color:var(--ink2); font-size:15px; margin:0}
+  main{max-width:1180px; margin:0 auto;}
+  .layout{display:grid; grid-template-columns:340px 1fr; gap:18px; align-items:start}
+  @media (max-width:980px){ .layout{grid-template-columns:1fr} }
+  .side, .charts{display:flex; flex-direction:column; gap:14px}
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px 16px 14px;}
+  .card h2{margin:0 0 4px; font-size:14px; font-weight:700; letter-spacing:.01em;
+    font-family:ui-sans-serif,system-ui,sans-serif; text-transform:uppercase; color:var(--ink)}
+  .card h3{margin:14px 0 6px; font-size:12px; font-weight:700; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--muted); font-family:ui-sans-serif,system-ui,sans-serif}
+  .card h3:first-child{margin-top:0}
+  .cap{margin:0 0 10px; font-size:12.5px; color:var(--muted); line-height:1.4}
+  .row{display:flex; align-items:center; justify-content:space-between; gap:8px; margin:4px 0}
+  .row label{font-size:13px; color:var(--ink2)}
+  .row input[type=number]{width:100px; padding:5px 8px; border:1px solid var(--axis); border-radius:8px;
+    background:var(--bg); color:var(--ink); font:12.5px ui-monospace,Menlo,Consolas,monospace; text-align:right}
+  .row select{padding:5px 8px; border:1px solid var(--axis); border-radius:8px;
+    background:var(--bg); color:var(--ink); font-size:12.5px; max-width:58%}
+  input[type=range]{width:100%; margin:2px 0 10px; accent-color:var(--accent)}
+  .hint{font-size:11.5px; color:var(--muted); margin:-4px 0 10px; line-height:1.35}
+  .mdef{background:var(--chipbg); border-radius:12px; padding:10px 12px; margin:0 0 12px}
+  .live-eq{overflow-x:auto}
+  .live-meta{margin-top:6px; font-size:13px; color:var(--ink2)}
+  .param-readout{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px}
+  .param-readout span{background:var(--bg); border:1px solid var(--border); border-radius:999px;
+    padding:3px 9px; font-size:12px; color:var(--ink2)}
+  .param-readout b{color:var(--ink)}
+  .param-readout em{font-style:normal; font-family:KaTeX_Math, Georgia, serif}
+  .chips{display:flex; flex-wrap:wrap; gap:6px; margin-top:4px}
+  .chip{background:var(--chipbg); border-radius:8px; padding:4px 9px; font-size:12px; color:var(--ink2)}
+  .chip b{color:var(--ink); font-weight:650}
+  .chip.ms b{color:var(--ms)} .chip.lyap b{color:var(--lyap)} .chip.harm b{color:var(--harm)} .chip.det b{color:var(--det)}
+  .chip.now b{color:var(--now)}
+  .pill{border-radius:999px; padding:4px 11px; font:650 12px system-ui,sans-serif; color:#fff; display:inline-block}
+  .pill.stable{background:var(--good)} .pill.msu{background:var(--warn)} .pill.lyapu{background:var(--now)} .pill.bim{background:var(--crit)}
+  .presets{display:flex; flex-wrap:wrap; gap:6px}
+  .presets button, .linkbtn, .runbtn{
+    border:1px solid var(--axis); background:var(--bg); color:var(--ink);
+    border-radius:9px; padding:7px 11px; font-size:12.5px; cursor:pointer}
+  .presets button:hover, .linkbtn:hover{border-color:var(--accent); color:var(--accent)}
+  .runbtn{background:var(--accent); color:#fff; border-color:transparent; font-weight:650}
+  .runbtn:hover{filter:brightness(1.06); color:#fff}
+  .btnrow{display:flex; gap:8px; margin-top:10px}
+  canvas.plot{width:100%; display:block; touch-action:none; border-radius:8px; background:var(--bg)}
+  .strip{display:grid; grid-template-columns:repeat(7,1fr); gap:6px}
+  @media (max-width:1100px){ .strip{grid-template-columns:repeat(4,1fr)} }
+  @media (max-width:700px){ .strip{grid-template-columns:1fr 1fr} }
+  .strip .mini{border:1px solid var(--border); border-radius:10px; padding:6px; background:var(--bg);
+    border-top:3px solid var(--border)}
+  .strip .mini .ttl{font-size:11px; color:var(--ink); margin:0 0 2px; line-height:1.25}
+  .strip .mini .ttl span{display:block; font-weight:400; font-size:10px; color:var(--muted)}
+  .strip .mini.msu, .strip .mini.lyap{border-top-color:var(--ms)}
+  .strip .mini.postL{border-top-color:var(--lyap)}
+  .strip .mini.harm, .strip .mini.postH{border-top-color:var(--det)}
+  .legend{display:flex; flex-wrap:wrap; gap:10px; font-size:12px; color:var(--ink2); margin-top:8px}
+  .legend i{display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:middle}
+  details.guide{border:1px solid var(--border); border-radius:14px; background:var(--surface); padding:0}
+  details.guide > summary{cursor:pointer; list-style:none; padding:14px 16px; font:700 13px ui-sans-serif,system-ui,sans-serif;
+    letter-spacing:.04em; text-transform:uppercase}
+  details.guide > summary::-webkit-details-marker{display:none}
+  details.guide[open] > summary{border-bottom:1px solid var(--border)}
+  .guide-body{padding:14px 16px 16px}
+  .guide-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  @media (max-width:700px){ .guide-grid{grid-template-columns:1fr} }
+  .knob{border:1px solid var(--border); border-radius:12px; padding:10px 12px; background:var(--bg)}
+  .knob-h{font-size:13px; font-weight:700; margin:0 0 4px; color:var(--ink)}
+  .knob p{margin:0; font-size:13px; color:var(--ink2); line-height:1.45}
+  .tip{display:none; margin-top:10px; padding:10px 12px; border-radius:10px; background:var(--tip); border:1px solid var(--tipborder);
+    font-size:13px; color:var(--ink2)}
+  .tip.on{display:block}
+  .theory{font-size:14px; color:var(--ink2)}
+  .theory .eq{margin:10px 0; overflow-x:auto}
+  footer{max-width:1180px; margin:34px auto 0; font-size:12.5px; color:var(--muted);
+    font-family:ui-sans-serif,system-ui,sans-serif}
+  footer a{color:var(--accent); text-decoration:none}
+  footer a:hover{text-decoration:underline}
+  html.embed header, html.embed details.guide, html.embed footer{display:none !important}
+  html.embed, html.embed body{height:auto !important; overflow:visible !important}
+  html.embed body{padding:0 0 8px; margin:0}
+  html.embed main{max-width:none}
+</style>
+<script>
+(function(){
+  if(window.self!==window.top || /(?:^|[?&])embed=/.test(location.search))
+    document.documentElement.classList.add("embed");
+  function ping(){
+    if(window.parent===window) return;
+    const h=Math.ceil(Math.max(document.documentElement.scrollHeight, document.body.scrollHeight));
+    parent.postMessage({type:"lab-height", height:h}, "*");
+  }
+  addEventListener("load", ping);
+  addEventListener("resize", ping);
+  if(window.ResizeObserver) new ResizeObserver(ping).observe(document.documentElement);
+  [80,400,1200].forEach(t=>setTimeout(ping,t));
+})();
+</script>
+</head>
+<body>
+
+<header>
+  <p class="eyebrow sans">Interactive lab · stochastic stability · 1-D cocycle · <a href="sgd-noise-shape-tutorial.html" style="color:var(--accent);text-decoration:none">start here: stability tutorial</a> · <a href="sgd-2d-bimodality.html" style="color:var(--accent);text-decoration:none">2-D sharp–tangent lab →</a></p>
+  <h1>The shape of SGD iterates
+    <span class="sub">Watch the quasi-stationary distribution of a scalar stochastic gradient map across stability edges</span>
+  </h1>
+  <div class="hero-eq">
+    $$X_{t+1}=(1-\eta h_t)\,X_t+\alpha X_t^{3}-\beta X_t^{5}+\sigma\xi_t$$
+  </div>
+  <p class="lede">
+    Curvature \(h_t\) is redrawn each step from a chosen law with mean \(\mu\) and variance \(v\).
+    Drag \(\eta\) across the mean-square edge \(\eta_{\mathrm{MS}}\), the Lyapunov edge \(\eta_L\),
+    and the empirical bimodality threshold \(\hat\eta_H\) to see the iterate cloud go from a spike at \(0\)
+    to a two-lobed distribution.
+  </p>
+</header>
+
+<main>
+<details class="guide" open>
+  <summary>What each coefficient does</summary>
+  <div class="guide-body">
+    <div class="guide-grid">
+      <div class="knob">
+        <div class="knob-h">\(\eta\) — step size</div>
+        <p>Primary control. Below \(\eta_{\mathrm{MS}}\) the origin is mean-square stable; past \(\eta_L\) pathwise linear stability is lost; near/above \(\hat\eta_H\) central mass depletes and two lobes appear.</p>
+      </div>
+      <div class="knob">
+        <div class="knob-h">\(\mu,\,v\) — curvature law</div>
+        <p>Mean and variance of \(h_t\). Larger \(v\) shrinks \(\eta_{\mathrm{MS}}=2\mu/(\mu^2+v)\) and widens the gap to \(\eta_L\). Keep \(v/\mu^2\) small for Gaussian if you want clean lobes.</p>
+      </div>
+      <div class="knob">
+        <div class="knob-h">\(\alpha\) — cubic / quartic map coeff.</div>
+        <p>Coefficient of \(X_t^3\) in the map (not multiplied by \(\eta\)). \(\alpha&gt;0\) drives the flip / period-2 lobes about \(0\); \(\alpha&lt;0\) flips that cubic drive.</p>
+      </div>
+      <div class="knob">
+        <div class="knob-h">\(\beta\) — quintic / sextic map coeff.</div>
+        <p>Coefficient in front of \(-X_t^5\). \(\beta&gt;0\) confines large amplitudes; \(\beta&lt;0\) anti-confines (can explode). Tune with \(\alpha\) so lobes stay finite.</p>
+      </div>
+      <div class="knob">
+        <div class="knob-h">\(\sigma\) — additive noise</div>
+        <p>Scale of \(\xi_t\sim\mathcal{N}(0,1)\). Default \(0\) is fine for the bimodal presets; a small \(\sigma&gt;0\) softens lobes and helps when the cloud collapses to \(0\).</p>
+      </div>
+      <div class="knob">
+        <div class="knob-h">Law of \(h_t\)</div>
+        <p>Gaussian / Uniform / Bernoulli / \(\chi^2\) (matched \(\mu,v\)), deterministic \(h\equiv\mu\), or <b>rare spike</b>: typically small \(h\), rarely huge \(h\), with fixed mean \(\mu\).</p>
+      </div>
+      <div class="knob">
+        <div class="knob-h">Rare spike \(\varepsilon,\,h_{\mathrm{low}}\)</div>
+        <p>\(P(h=h_{\mathrm{high}})=\varepsilon\), else \(h_{\mathrm{low}}\), with \(h_{\mathrm{high}}\) chosen so \(\mathbb{E}[h]=\mu\). Can be bimodal with \(\eta\ll 2/\mu\) while \(h\equiv\mu\) stays at \(0\). Often lag-1 \(&gt;0\) (well-hopping), not flip period-2.</p>
+      </div>
+    </div>
+    <div class="tip on" id="tip_stoch">
+      <b>Tip.</b> Start from the Gaussian default preset, then move only \(\eta\). Watch the Fig.&nbsp;1 strip: spike at \(0\) → broadening → two lobes about \(\pm 1\).
+    </div>
+    <div class="tip" id="tip_det">
+      <b>Deterministic mode.</b> All edges collapse to \(2/\mu\). Additive noise \(\sigma\) broadens the period-2 orbit into two stochastic lobes (Thm.&nbsp;1–3).
+    </div>
+    <div class="tip" id="tip_spike">
+      <b>Rare-spike mode.</b> \(\eta_{\mathrm{MS}}\) and \(\eta_L\) collapse near \(2/h_{\mathrm{high}}\ll 2/\mu\). You can sit past those rare-event edges yet far below \(2/\mu\): two lobes appear, while the mean-field control \(h\equiv\mu\) at the same \(\eta\) stays at \(0\). Lag-1 is often positive (well-hopping), not classic flip period-2.
+    </div>
+  </div>
+</details>
+
+<section class="layout" style="margin-top:14px">
+  <div class="side">
+    <div class="card">
+      <h2>Controls</h2>
+      <div class="mdef" id="mdef"></div>
+
+      <h3>Curvature</h3>
+      <div class="row"><label for="law">law of \(h_t\)</label>
+        <select id="law">
+          <option value="gaussian" selected>Gaussian</option>
+          <option value="uniform">Uniform</option>
+          <option value="bernoulli">Bernoulli (two-point)</option>
+          <option value="chisq">scaled χ²</option>
+          <option value="spike">rare spike (skewed)</option>
+          <option value="deterministic">deterministic (Thm 1)</option>
+        </select>
+      </div>
+      <div class="row"><label for="mu">mean \(\mu\)</label><input id="mu" type="number" step="any" value="1"></div>
+      <input id="mu_s" type="range" min="20" max="300" value="100" aria-label="mean slider">
+      <p class="hint">Sets the scale of the edge: roughly \(\eta\sim 2/\mu\).</p>
+      <div class="row" id="row_var"><label for="v">variance \(v\)</label><input id="v" type="number" step="any" value="0.01"></div>
+      <input id="v_s" type="range" min="0" max="200" value="2" aria-label="variance slider">
+      <p class="hint" id="hint_var">Matched across laws. Small \(v\) ⇒ \(\eta_{\mathrm{MS}}\approx\eta_L\approx 2/\mu\).</p>
+      <div id="spike_controls" style="display:none">
+        <div class="row"><label for="eps">rare prob \(\varepsilon\)</label><input id="eps" type="number" step="any" min="0.001" max="0.5" value="0.02"></div>
+        <input id="eps_s" type="range" min="1" max="200" value="20" aria-label="epsilon slider">
+        <p class="hint">\(P(h=h_{\mathrm{high}})=\varepsilon\). Smaller \(\varepsilon\) ⇒ rarer, larger spike (\(h_{\mathrm{high}}\approx\mu/\varepsilon\) if \(h_{\mathrm{low}}=0\)).</p>
+        <div class="row"><label for="h_low">typical \(h_{\mathrm{low}}\)</label><input id="h_low" type="number" step="any" value="0"></div>
+        <input id="h_low_s" type="range" min="0" max="100" value="0" aria-label="h_low slider">
+        <p class="hint" id="spike_readout">\(h_{\mathrm{high}}\) and \(v\) are fixed by \((\mu,\varepsilon,h_{\mathrm{low}})\).</p>
+      </div>
+
+      <h3>Nonlinearity</h3>
+      <div class="row"><label for="alpha">\(\alpha\) (cubic)</label><input id="alpha" type="number" step="any" value="0.775"></div>
+      <input id="alpha_s" type="range" min="-200" max="200" value="31" aria-label="alpha slider">
+      <p class="hint">Map term \(+\alpha X^3\). Positive ⇒ period-2 drive about \(0\).</p>
+      <div class="row"><label for="beta">\(\beta\) (quintic)</label><input id="beta" type="number" step="any" value="-0.05"></div>
+      <input id="beta_s" type="range" min="-200" max="200" value="-2" aria-label="beta slider">
+      <p class="hint">Map term \(-\beta X^5\). Sign/magnitude set confinement.</p>
+      <div class="row"><label for="sigma">\(\sigma\) (noise)</label><input id="sigma" type="number" step="any" value="0.0625"></div>
+      <input id="sigma_s" type="range" min="0" max="200" value="25" aria-label="sigma slider">
+
+      <h3>Step size</h3>
+      <div class="row"><label for="eta">\(\eta\)</label><input id="eta" type="number" step="any" value="2.821"></div>
+      <input id="eta_s" type="range" min="0" max="1000" value="500" aria-label="eta slider">
+      <div class="cap" id="eta_cap">drag across \(\eta_{\mathrm{MS}}\to\eta_L\to\hat\eta_H\)</div>
+
+      <h3>Simulation</h3>
+      <div class="row"><label for="npart">particles</label><input id="npart" type="number" min="200" max="20000" step="100" value="4000"></div>
+      <div class="row"><label for="steps">steps \(T\)</label><input id="steps" type="number" min="500" max="100000" step="500" value="8000"></div>
+      <div class="row"><label for="burn">burn-in</label><input id="burn" type="number" min="0" max="50000" step="100" value="2500"></div>
+      <div class="row"><label for="seed">seed</label><input id="seed" type="number" min="0" max="1e9" step="1" value="0"></div>
+      <div class="btnrow">
+        <button class="runbtn" id="run">Run</button>
+        <button class="linkbtn" id="rerun">re-seed &amp; run</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="charts">
+    <div class="card">
+      <h2>Across the edges</h2>
+      <p class="cap">Same map and curvature; only the step size changes. Spike, then tails after Lyapunov, then two lobes.</p>
+      <div class="strip" id="strip"></div>
+    </div>
+
+    <div class="card">
+      <h2>Quasi-stationary iterate distribution</h2>
+      <p class="cap" id="hist_cap">histogram of the particle cloud after burn-in</p>
+      <canvas class="plot" id="chist" width="900" height="400" role="img" aria-label="iterate histogram"></canvas>
+      <div class="legend">
+        <span><i style="background:var(--accent)"></i>density \(p(X)\)</span>
+        <span><i style="background:var(--ms)"></i>\(\eta_{\mathrm{MS}}\)</span>
+        <span><i style="background:var(--det)"></i>\(2/\mu\)</span>
+        <span><i style="background:var(--lyap)"></i>\(\eta_L\)</span>
+        <span><i style="background:var(--harm)"></i>\(\hat\eta_H\)</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Sample trajectory</h2>
+      <p class="cap">One particle. True period-2 about \(0\) alternates sign (green / orange markers on the last steps).</p>
+      <canvas class="plot" id="ctraj" width="900" height="230" role="img" aria-label="trajectory"></canvas>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  Lab for the 1-D model in <em>The Shape of SGD Iterates Beyond Stochastic Stability</em>.
+  Source: <a href="https://github.com/Avra98/sgd-1d-bimodality">github.com/Avra98/sgd-1d-bimodality</a>
+</footer>
+
+<script>
+
+/* ===================== RNG ===================== */
+function mulberry32(a){
+  return function(){
+    let t = a += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function randn(rng){
+  // Box-Muller
+  let u=0,v=0;
+  while(u===0) u=rng();
+  while(v===0) v=rng();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+}
+function randChi2(k, rng){
+  // Wilson-Hilferty / sum of squares for small k; gamma via Marsaglia for general
+  if(k >= 1 && Math.abs(k - Math.round(k)) < 1e-9 && k <= 20){
+    let s=0; const n=Math.round(k);
+    for(let i=0;i<n;i++){ const z=randn(rng); s+=z*z; }
+    return s;
+  }
+  // Marsaglia-Tsang for Gamma(k/2, 1/2) = Chi2(k): shape a=k/2, scale 2
+  const a = k/2;
+  if(a < 1){
+    // boost: Gamma(a)=Gamma(a+1)*U^{1/a}
+    return randChi2(k+2, rng) * Math.pow(rng(), 2/k);
+  }
+  const d = a - 1/3, c = 1/Math.sqrt(9*d);
+  for(;;){
+    let x, v;
+    do{ x = randn(rng); v = 1 + c*x; } while(v <= 0);
+    v = v*v*v;
+    const u = rng();
+    if(u < 1 - 0.0331*(x*x)*(x*x)) return 2*d*v;
+    if(Math.log(u) < 0.5*x*x + d*(1 - v + Math.log(v))) return 2*d*v;
+  }
+}
+
+/* ===================== Curvature sampling ===================== */
+function spikeMoments(mu, eps, hLow){
+  const e = Math.min(Math.max(+eps || 0.02, 1e-6), 1 - 1e-6);
+  const hl = +hLow || 0;
+  const hh = (mu - (1 - e)*hl) / e;
+  const eh2 = (1 - e)*hl*hl + e*hh*hh;
+  const v = Math.max(eh2 - mu*mu, 0);
+  return {eps:e, hLow:hl, hHigh:hh, v};
+}
+function sampleH(p, rng){
+  const {law, mu, v} = p;
+  if(law === 'spike'){
+    const sp = p.spike || spikeMoments(mu, p.eps, p.h_low);
+    return rng() < sp.eps ? sp.hHigh : sp.hLow;
+  }
+  const s = Math.sqrt(Math.max(v, 0));
+  if(law === 'deterministic' || s === 0) return mu;
+  if(law === 'gaussian') return mu + s*randn(rng);
+  if(law === 'uniform'){
+    const a = s*Math.sqrt(3);
+    return mu - a + 2*a*rng();
+  }
+  if(law === 'bernoulli') return mu + (rng() < 0.5 ? -s : s);
+  if(law === 'chisq'){
+    // match mean μ, var v: h = c * Chi2(k), c k = μ, c² 2k = v ⇒ k = 2 μ² / v
+    const k = Math.max(2*mu*mu / Math.max(v, 1e-12), 0.5);
+    const c = mu / k;
+    return c * randChi2(k, rng);
+  }
+  return mu;
+}
+
+/* ===================== Edges ===================== */
+function etaMS(mu, v){
+  return 2*mu / (mu*mu + Math.max(v, 0));
+}
+function mcExpect(p, fn, n, seed){
+  const rng = mulberry32(seed >>> 0);
+  let s = 0;
+  for(let i=0;i<n;i++) s += fn(sampleH(p, rng));
+  return s / n;
+}
+function etaLyapunov(p, seed){
+  if(p.law === 'deterministic' || p.v <= 0) return 2/p.mu;
+  // closed form for two-point spike
+  if(p.law === 'spike'){
+    const sp = p.spike;
+    let lo = 1e-6, hi = 40/Math.max(p.mu, 1e-6);
+    for(let it=0; it<60; it++){
+      const mid = 0.5*(lo+hi);
+      const m = (1-sp.eps)*Math.log(Math.abs(1-mid*sp.hLow)+1e-30)
+              + sp.eps*Math.log(Math.abs(1-mid*sp.hHigh)+1e-30);
+      if(m < 0) lo = mid; else hi = mid;
+    }
+    return 0.5*(lo+hi);
+  }
+  // bisection on E[log|1-ηh|] = 0
+  let lo = 1e-6, hi = 40/Math.max(p.mu, 1e-6);
+  for(let it=0; it<48; it++){
+    const mid = 0.5*(lo+hi);
+    const m = mcExpect(p, h => Math.log(Math.abs(1 - mid*h) + 1e-30), 80000, seed+it*97);
+    if(m < 0) lo = mid; else hi = mid;
+  }
+  return 0.5*(lo+hi);
+}
+function harmonicH(p, eta, seed){
+  // E[1/|1-ηh|] with floor to avoid hard singularities in MC
+  return mcExpect(p, h => 1 / Math.max(Math.abs(1 - eta*h), 1e-3), 60000, seed+3);
+}
+
+/* ===================== Simulation ===================== */
+function stepX(x, h, eta, alpha, beta, sigma, rng){
+  // α, β are map coefficients (not η·loss-coeffs): X ← (1−ηh)X + α X³ − β X⁵ + σξ
+  const x2 = x*x, x3 = x2*x, x5 = x3*x2;
+  let y = (1 - eta*h)*x + alpha*x3 - beta*x5;
+  if(sigma > 0) y += sigma * randn(rng);
+  return y;
+}
+
+function runCloud(p){
+  const {eta, alpha, beta, sigma, npart, steps, burn, seed} = p;
+  const rng = mulberry32(seed >>> 0);
+  const x = new Float64Array(npart);
+  for(let i=0;i<npart;i++) x[i] = 0.15 * (rng() < 0.5 ? -1 : 1) * (0.3 + 0.7*rng());
+
+  const traj = [];
+  const bound = 12;
+  let escapes = 0;
+  // Pass 1: evolve; track post-burn-in support so the histogram window
+  // can expand past the old ±2.8 (lobes often sit near ±3–6 for α<0).
+  let maxAbs = 1.5;
+  const post = [];
+  for(let t=0; t<steps; t++){
+    for(let i=0;i<npart;i++){
+      const h = sampleH(p, rng);
+      let y = stepX(x[i], h, eta, alpha, beta, sigma, rng);
+      if(!Number.isFinite(y) || Math.abs(y) > bound){
+        escapes++;
+        let j = (Math.floor(rng()*npart))|0;
+        let guard = 0;
+        while((!Number.isFinite(x[j]) || Math.abs(x[j]) > bound) && guard++ < 8){
+          j = (Math.floor(rng()*npart))|0;
+        }
+        y = (Number.isFinite(x[j]) && Math.abs(x[j]) <= bound) ? x[j] : 0.1*(rng()-0.5);
+      }
+      x[i] = y;
+      if(t >= burn){
+        const a = Math.abs(y);
+        if(a > maxAbs) maxAbs = a;
+      }
+    }
+    traj.push(x[0]);
+    if(t >= burn){
+      // subsample particles each step to keep memory light
+      for(let i=0;i<npart;i+=4) post.push(x[i]);
+    }
+  }
+  const R = Math.min(bound, Math.max(3.0, 1.25 * maxAbs));
+  const xmin = -R, xmax = R;
+  const nbins = 140;
+  const bw = (xmax - xmin) / nbins;
+  const hist = new Float64Array(nbins);
+  let nAcc = 0;
+  for(let k=0;k<post.length;k++){
+    const xi = post[k];
+    if(xi < xmin || xi >= xmax) continue;
+    const b = Math.min(nbins-1, Math.max(0, ((xi - xmin) / bw)|0));
+    hist[b] += 1;
+    nAcc++;
+  }
+  const dens = new Float64Array(nbins);
+  const centers = new Float64Array(nbins);
+  const scale = nAcc > 0 ? 1 / (nAcc * bw) : 0;
+  for(let b=0;b<nbins;b++){
+    dens[b] = hist[b] * scale;
+    centers[b] = xmin + (b + 0.5)*bw;
+  }
+  return {centers, dens, traj, escapes, xmin, xmax, maxAbs};
+}
+
+function isBimodal(centers, dens){
+  // True two-lobe: nontrivial mass on BOTH sides of 0, with a dip at 0.
+  // (Old check fired on a single off-center peak — "central depletion" false positive.)
+  let i0 = 0, best = Infinity;
+  for(let i=0;i<centers.length;i++){
+    const a = Math.abs(centers[i]);
+    if(a < best){ best = a; i0 = i; }
+  }
+  let left = 0, right = 0;
+  for(let i=0;i<centers.length;i++){
+    if(centers[i] < -0.25) left = Math.max(left, dens[i]);
+    if(centers[i] >  0.25) right = Math.max(right, dens[i]);
+  }
+  const p0 = dens[i0];
+  const side = Math.max(left, right);
+  const both = left > 0.25 && right > 0.25;
+  const dip = p0 < 0.88 * Math.min(left, right);
+  return {bimodal: both && dip, p0, side, left, right, peak: Math.max(...dens)};
+}
+
+const _etaHCache = new Map();
+function estimateEtaH(base, seed){
+  // smallest η with bimodal histogram (cached by law/params)
+  const key = [base.law, base.mu, base.v, base.alpha, base.beta, base.sigma, base.eps, base.h_low]
+    .map(x => +x === +x ? (+x).toFixed(5) : x).join('|');
+  if(_etaHCache.has(key)) return _etaHCache.get(key);
+  const eL = base.eL;
+  const eMS = base.eMS;
+  // rare-spike bimodality can appear well below η_L / 2/μ
+  let lo = (base.law === 'spike')
+    ? Math.max(1e-4, Math.min(eMS, base.eRare || eMS) * 0.5)
+    : Math.max(eL * 0.98, eMS);
+  let hi = (base.law === 'spike') ? Math.max(eL * 1.2, 2/base.mu) : eL * 2.4;
+  let found = null;
+  const grid = 7;
+  for(let i=0;i<=grid;i++){
+    const eta = lo + (hi-lo)*i/grid;
+    const sim = runCloud({...base, eta, npart: 1200, steps: 2200, burn: 800, seed: seed+11+i});
+    if(isBimodal(sim.centers, sim.dens).bimodal){ found = eta; break; }
+  }
+  if(found == null){ _etaHCache.set(key, NaN); return NaN; }
+  let L = Math.max(lo, found - (hi-lo)/grid), R = found;
+  for(let it=0; it<4; it++){
+    const mid = 0.5*(L+R);
+    const sim = runCloud({...base, eta: mid, npart: 1200, steps: 2200, burn: 800, seed: seed+100+it});
+    if(isBimodal(sim.centers, sim.dens).bimodal) R = mid; else L = mid;
+  }
+  _etaHCache.set(key, R);
+  return R;
+}
+
+/* ===================== UI helpers ===================== */
+function $(id){ return document.getElementById(id); }
+function fmt(x, d=3){
+  if(x == null || !Number.isFinite(x)) return '—';
+  if(Math.abs(x) >= 100) return x.toFixed(1);
+  if(Math.abs(x) >= 10) return x.toFixed(2);
+  return x.toFixed(d);
+}
+function syncSlider(numId, sId, toSlider, fromSlider){
+  const n = $(numId), s = $(sId);
+  const applyNum = () => { s.value = String(toSlider(+n.value)); };
+  const applyS = () => { n.value = String(fromSlider(+s.value)); };
+  n.addEventListener('change', () => { applyNum(); schedule(); });
+  s.addEventListener('input', () => { applyS(); schedule(); });
+  applyNum();
+}
+
+function readParams(){
+  const law = $('law').value;
+  const mu = +$('mu').value;
+  const eps = +$('eps').value;
+  const h_low = +$('h_low').value;
+  const spike = (law === 'spike') ? spikeMoments(mu, eps, h_low) : null;
+  const v = spike ? spike.v : +$('v').value;
+  return {
+    law, mu, v, eps, h_low, spike,
+    alpha: +$('alpha').value,
+    beta: +$('beta').value,
+    sigma: +$('sigma').value,
+    eta: +$('eta').value,
+    npart: +$('npart').value|0,
+    steps: +$('steps').value|0,
+    burn: +$('burn').value|0,
+    seed: +$('seed').value|0,
+  };
+}
+
+function updateDef(p){
+  const lawTex = {
+    gaussian: String.raw`h_t\sim\mathcal{N}(\mu,v)`,
+    uniform: String.raw`h_t\sim\mathrm{Unif}` + ' (matched moments)',
+    bernoulli: String.raw`h_t\in\{\mu-\sqrt{v},\,\mu+\sqrt{v}\}` + ' w.p. ' + String.raw`\tfrac12`,
+    chisq: String.raw`h_t=c\cdot\chi^2_k` + ' (matched moments)',
+    spike: p.spike
+      ? String.raw`P(h=${fmt(p.spike.hHigh,2)})=\varepsilon,\; P(h=${fmt(p.spike.hLow,2)})=1-\varepsilon`
+      : 'rare spike',
+    deterministic: String.raw`h_t\equiv\mu` + ' (additive Thm 1)',
+  }[p.law];
+  const eq = String.raw`X_{t+1}=(1-\eta h_t)\,X_t+\alpha X_t^3-\beta X_t^5+\sigma\xi_t`;
+  const box = $('mdef');
+  box.innerHTML =
+    `<div class="live-eq" id="live_eq"></div>` +
+    `<div class="live-meta" id="live_meta"></div>`;
+  if (window.katex) {
+    katex.render(eq, $('live_eq'), {displayMode:true, throwOnError:false});
+    katex.render(lawTex, $('live_meta'), {displayMode:false, throwOnError:false});
+  } else {
+    $('live_eq').textContent = eq;
+    $('live_meta').textContent = lawTex;
+  }
+  if(p.law === 'spike' && p.spike){
+    $('spike_readout').innerHTML =
+      `Derived: \(h_{\\mathrm{high}}=${fmt(p.spike.hHigh,3)}\), \(v=${fmt(p.spike.v,3)}\). ` +
+      `Compare \(\\eta\) to \(2/\\mu=${fmt(2/p.mu)}\) vs \(2/h_{\\mathrm{high}}=${fmt(2/p.spike.hHigh)}\).`;
+    typesetMath($('spike_readout'));
+  }
+
+  const isSpike = p.law === 'spike';
+  const isDet = p.law === 'deterministic';
+  $('spike_controls').style.display = isSpike ? 'block' : 'none';
+  $('row_var').style.opacity = (isDet || isSpike) ? 0.4 : 1;
+  $('v_s').disabled = isDet || isSpike;
+  $('v').disabled = isDet || isSpike;
+  if(isSpike) $('v').value = String(+p.v.toFixed(6));
+  $('hint_var').textContent = isSpike
+    ? 'Variance is implied by (μ, ε, h_low) for the rare-spike law.'
+    : 'Matched across laws. Small v ⇒ η_MS ≈ η_L ≈ 2/μ.';
+
+  document.querySelectorAll('.tip').forEach(el => el.classList.remove('on'));
+  const tipId = isDet ? 'tip_det' : (isSpike ? 'tip_spike' : 'tip_stoch');
+  const tip = document.getElementById(tipId);
+  if (tip) tip.classList.add('on');
+}
+
+function typesetMath(root){
+  if (!window.renderMathInElement) return;
+  renderMathInElement(root || document.body, {
+    delimiters: [
+      {left: '$$', right: '$$', display: true},
+      {left: '\\[', right: '\\]', display: true},
+      {left: '$', right: '$', display: false},
+      {left: '\\(', right: '\\)', display: false},
+    ],
+    throwOnError: false,
+  });
+}
+
+function computeEdges(p){
+  const vEff = (p.law === 'deterministic') ? 0 : Math.max(p.v, 0);
+  const pEff = {...p, v: vEff};
+  const eMS = etaMS(p.mu, vEff);
+  const eL = etaLyapunov(pEff, p.seed+1);
+  const eDet = 2 / p.mu;
+  const eRare = (p.law === 'spike' && p.spike && p.spike.hHigh > 0)
+    ? 2 / p.spike.hHigh : NaN;
+  return {eMS, eL, eDet, eRare, vEff};
+}
+
+/* ===================== Drawing ===================== */
+function dpiCanvas(c){
+  const dpr = window.devicePixelRatio || 1;
+  const rect = c.getBoundingClientRect();
+  const cssW = Math.max(300, rect.width || c.width);
+  const cssH = c.height / (c.width / cssW);
+  c.width = Math.round(cssW * dpr);
+  c.height = Math.round(cssH * dpr);
+  const ctx = c.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return {ctx, W: cssW, H: cssH};
+}
+function drawHist(canvas, sim, edges, eta){
+  const {ctx, W, H} = dpiCanvas(canvas);
+  ctx.clearRect(0,0,W,H);
+  const pad = {l:48, r:16, t:16, b:36};
+  const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
+  const xMin = sim.xmin, xMax = sim.xmax;
+  const yMax = Math.max(0.1, Math.max(...sim.dens) * 1.12);
+  const X = x => pad.l + (x - xMin)/(xMax - xMin) * pw;
+  const Y = y => pad.t + (1 - y/yMax) * ph;
+
+  // grid
+  ctx.strokeStyle = getCss('--grid'); ctx.lineWidth = 1;
+  ctx.beginPath();
+  for(let i=0;i<=4;i++){
+    const y = pad.t + ph*i/4;
+    ctx.moveTo(pad.l, y); ctx.lineTo(pad.l+pw, y);
+  }
+  ctx.stroke();
+
+  // bars
+  const bw = (xMax - xMin) / sim.dens.length;
+  ctx.fillStyle = 'rgba(42,120,214,0.55)';
+  for(let i=0;i<sim.dens.length;i++){
+    const x0 = X(sim.centers[i] - bw/2);
+    const x1 = X(sim.centers[i] + bw/2);
+    const y = Y(sim.dens[i]);
+    ctx.fillRect(x0, y, Math.max(1, x1-x0-0.5), pad.t+ph - y);
+  }
+  // density outline
+  ctx.strokeStyle = getCss('--accent'); ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  for(let i=0;i<sim.dens.length;i++){
+    const xx = X(sim.centers[i]), yy = Y(sim.dens[i]);
+    if(i===0) ctx.moveTo(xx,yy); else ctx.lineTo(xx,yy);
+  }
+  ctx.stroke();
+
+  // zero line
+  ctx.strokeStyle = getCss('--axis'); ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(X(0), pad.t); ctx.lineTo(X(0), pad.t+ph); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // axes
+  ctx.strokeStyle = getCss('--axis'); ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, pad.t+ph); ctx.lineTo(pad.l+pw, pad.t+ph);
+  ctx.stroke();
+  ctx.fillStyle = getCss('--muted'); ctx.font = '11px system-ui';
+  ctx.fillText('X', W/2, H-8);
+  ctx.save(); ctx.translate(14, H/2); ctx.rotate(-Math.PI/2); ctx.fillText('density', 0, 0); ctx.restore();
+  const span = xMax - xMin;
+  const tickStep = span > 10 ? 2 : (span > 6 ? 1 : 1);
+  for(let xv = Math.ceil(xMin); xv <= Math.floor(xMax); xv += tickStep){
+    ctx.fillText(String(xv), X(xv)-4, pad.t+ph+14);
+  }
+
+  // eta marker as text chip (eta is step size, not on x-axis) — show edges as legend text top-right
+  ctx.font = '12px ui-monospace, Menlo, monospace';
+  ctx.fillStyle = getCss('--ink2');
+  ctx.textAlign = 'right';
+  let ty = pad.t + 14;
+  const rows = [
+    [`η = ${fmt(eta,3)}`, getCss('--ink')],
+    [`η_MS = ${fmt(edges.eMS)}`, getCss('--ms')],
+    [`2/μ = ${fmt(edges.eDet)}`, getCss('--det')],
+    [`η_L = ${fmt(edges.eL)}`, getCss('--lyap')],
+    [`η̂_H = ${fmt(edges.eH)}`, getCss('--harm')],
+  ];
+  for(const [t,col] of rows){ ctx.fillStyle = col; ctx.fillText(t, pad.l+pw-4, ty); ty += 15; }
+  ctx.textAlign = 'left';
+}
+function getCss(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+function drawTraj(canvas, traj){
+  const {ctx, W, H} = dpiCanvas(canvas);
+  ctx.clearRect(0,0,W,H);
+  const pad = {l:48, r:16, t:12, b:28};
+  const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
+  const n = traj.length;
+  let yMax = 0.2;
+  for(let i=0;i<n;i++) yMax = Math.max(yMax, Math.abs(traj[i]));
+  yMax *= 1.15;
+  const X = i => pad.l + i/(n-1) * pw;
+  const Y = y => pad.t + (0.5 - 0.5*y/yMax) * ph;
+
+  ctx.strokeStyle = getCss('--grid'); ctx.beginPath();
+  ctx.moveTo(pad.l, Y(0)); ctx.lineTo(pad.l+pw, Y(0)); ctx.stroke();
+
+  // show last 400 steps for clarity
+  const start = Math.max(0, n - 400);
+  ctx.strokeStyle = getCss('--accent'); ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  for(let i=start;i<n;i++){
+    const xx = pad.l + (i-start)/(n-1-start) * pw;
+    const yy = Y(traj[i]);
+    if(i===start) ctx.moveTo(xx,yy); else ctx.lineTo(xx,yy);
+  }
+  ctx.stroke();
+  // even/odd markers on last 40
+  const m0 = Math.max(start, n-40);
+  for(let i=m0;i<n;i++){
+    ctx.fillStyle = (i%2===0) ? getCss('--sharpmid') : getCss('--now');
+    ctx.beginPath(); ctx.arc(pad.l + (i-start)/(n-1-start)*pw, Y(traj[i]), 2.2, 0, 6.28); ctx.fill();
+  }
+  ctx.strokeStyle = getCss('--axis');
+  ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, pad.t+ph); ctx.lineTo(pad.l+pw, pad.t+ph); ctx.stroke();
+  ctx.fillStyle = getCss('--muted'); ctx.font = '11px system-ui';
+  ctx.fillText('t (last steps)', W/2 - 30, H-6);
+  ctx.fillText('+' + fmt(yMax,2), pad.l+4, pad.t+10);
+  ctx.fillText('-' + fmt(yMax,2), pad.l+4, pad.t+ph);
+}
+
+function drawMini(container, sim, title, sub, kind){
+  const wrap = document.createElement('div');
+  wrap.className = 'mini' + (kind ? ' '+kind : '');
+  wrap.innerHTML = `<div class="ttl"><b>${title}</b>${sub ? `<span>${sub}</span>` : ''}</div>`;
+  const c = document.createElement('canvas');
+  c.width = 220; c.height = 120; c.className = 'plot';
+  wrap.appendChild(c);
+  container.appendChild(wrap);
+  const {ctx, W, H} = dpiCanvas(c);
+  const pad = {l:4, r:4, t:4, b:4};
+  const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
+  const yMax = Math.max(0.1, Math.max(...sim.dens)*1.1);
+  const X = x => pad.l + (x - sim.xmin)/(sim.xmax - sim.xmin) * pw;
+  const Y = y => pad.t + (1 - y/yMax) * ph;
+  ctx.fillStyle = 'rgba(42,120,214,0.5)';
+  const bw = (sim.xmax - sim.xmin) / sim.dens.length;
+  for(let i=0;i<sim.dens.length;i++){
+    const x0 = X(sim.centers[i] - bw/2);
+    const x1 = X(sim.centers[i] + bw/2);
+    const y = Y(sim.dens[i]);
+    ctx.fillRect(x0, y, Math.max(1,x1-x0), pad.t+ph-y);
+  }
+  ctx.strokeStyle = getCss('--axis'); ctx.setLineDash([2,2]);
+  ctx.beginPath(); ctx.moveTo(X(0), pad.t); ctx.lineTo(X(0), pad.t+ph); ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+/* ===================== Main update ===================== */
+let busy = false, timer = null, lastEdges = null;
+
+function schedule(){
+  clearTimeout(timer);
+  timer = setTimeout(runAll, 120);
+}
+
+function regimePill(eta, e, law){
+  if(law === 'spike' && Number.isFinite(e.eDet) && eta < e.eDet){
+    if(eta < e.eMS) return ['stable', 'below η_MS · still ≪ 2/μ'];
+    if(Number.isFinite(e.eH) && eta >= e.eH) return ['bim', 'bimodal · past rare edge · before 2/μ'];
+    if(eta >= e.eL) return ['lyapu', 'past η_L (rare) · before 2/μ'];
+    return ['msu', 'past η_MS · before 2/μ'];
+  }
+  if(eta < e.eMS) return ['stable', 'mean-square stable'];
+  if(eta < e.eL) return ['msu', 'past η_MS · before η_L'];
+  if(Number.isFinite(e.eH) && eta >= e.eH) return ['bim', 'past η̂_H · bimodal regime'];
+  return ['lyapu', 'past η_L · broadening'];
+}
+
+function etaSliderRange(edges, law){
+  // Rare-spike: η_MS≈η_L≈2/h_high ≪ 2/μ — slider must reach the mean edge.
+  if(law === 'spike'){
+    const lo = 0.1 * Math.min(edges.eMS, edges.eRare || edges.eMS);
+    const hi = 1.05 * edges.eDet;
+    return {etaLo: Math.max(1e-4, lo), etaHi: Math.max(hi, edges.eL * 2)};
+  }
+  return {etaLo: 0.25 * edges.eMS, etaHi: 2.2 * edges.eL};
+}
+
+function runAll(){
+  if(busy) return;
+  busy = true;
+  const p = readParams();
+  updateDef(p);
+  try{
+    const edges = computeEdges(p);
+    const {etaLo, etaHi} = etaSliderRange(edges, p.law);
+    // if user moved number, keep; slider sync separately below
+
+    const base = {...p, eMS: edges.eMS, eL: edges.eL, eDet: edges.eDet, eRare: edges.eRare, v: edges.vEff};
+    // estimate η_H (skip if deterministic+σ=0 and below edge — still try)
+    const eH = estimateEtaH(base, p.seed);
+    edges.eH = eH;
+    lastEdges = edges;
+
+    const Hcur = harmonicH({...p, v: edges.vEff}, p.eta, p.seed+5);
+
+    let edgeHtml =
+      `<span class="chip ms">$\\eta_{\\mathrm{MS}}$ = <b>${fmt(edges.eMS)}</b></span>` +
+      `<span class="chip det">$2/\\mu$ = <b>${fmt(edges.eDet)}</b></span>`;
+    if(Number.isFinite(edges.eRare)){
+      edgeHtml += `<span class="chip now">$2/h_{\\mathrm{high}}$ = <b>${fmt(edges.eRare)}</b></span>`;
+    }
+    edgeHtml +=
+      `<span class="chip lyap">$\\eta_L$ = <b>${fmt(edges.eL)}</b></span>` +
+      `<span class="chip harm">$\\hat\\eta_H$ = <b>${fmt(edges.eH)}</b></span>` +
+      `<span class="chip">$H(\\eta)\\approx$ <b>${fmt(Hcur,2)}</b></span>`;
+    if($('edges')){
+      $('edges').innerHTML = edgeHtml;
+      typesetMath($('edges'));
+    }
+    if($('regime')){
+      const [cls, lab] = regimePill(p.eta, edges, p.law);
+      $('regime').innerHTML = `<span class="pill ${cls}">${lab}</span>`;
+      typesetMath($('regime'));
+    }
+
+    // main simulation
+    const sim = runCloud(p);
+    const bim = isBimodal(sim.centers, sim.dens);
+    drawHist($('chist'), sim, edges, p.eta);
+    drawTraj($('ctraj'), sim.traj);
+
+    const lagN = Math.min(2000, sim.traj.length-1);
+    let num=0, den1=0, den2=0;
+    const t0 = sim.traj.length - lagN - 1;
+    let m1=0,m2=0;
+    for(let i=0;i<lagN;i++){ m1+=sim.traj[t0+i]; m2+=sim.traj[t0+i+1]; }
+    m1/=lagN; m2/=lagN;
+    for(let i=0;i<lagN;i++){
+      const a=sim.traj[t0+i]-m1, b=sim.traj[t0+i+1]-m2;
+      num+=a*b; den1+=a*a; den2+=b*b;
+    }
+    const lag1 = num / Math.sqrt((den1+1e-30)*(den2+1e-30));
+
+    if($('stats')) $('stats').innerHTML =
+      `<span class="chip">p(0)=<b>${fmt(bim.p0,2)}</b></span>` +
+      `<span class="chip">left=<b>${fmt(bim.left,2)}</b></span>` +
+      `<span class="chip">right=<b>${fmt(bim.right,2)}</b></span>` +
+      `<span class="chip">bimodal=<b>${bim.bimodal ? 'yes' : 'no'}</b></span>` +
+      `<span class="chip">lag-1=<b>${fmt(lag1,2)}</b></span>` +
+      `<span class="chip">|x|max=<b>${fmt(sim.maxAbs,2)}</b></span>` +
+      `<span class="chip">escapes=<b>${sim.escapes}</b></span>`;
+
+    $('hist_cap').textContent =
+      `N=${p.npart} particles · T=${p.steps} (burn ${p.burn}) · seed ${p.seed}` +
+      ` · axis [−${fmt(-sim.xmin,1)}, ${fmt(sim.xmax,1)}] (auto)` +
+      (bim.bimodal ? ' · two-sided lobes' : ' · not two-sided bimodal');
+
+    const strip = $('strip'); strip.innerHTML = '';
+    const H = Number.isFinite(eH) ? eH : 1.12*edges.eL;
+    const gap = Math.max(H - edges.eL, 0.04*edges.eL);
+    const etas = (p.law === 'spike') ? [
+      [0.5*(edges.eRare || edges.eMS), 'MS unstable', 'η_MS < η < η_L', 'msu'],
+      [edges.eRare || edges.eMS, 'Lyapunov edge', 'η = η_L', 'lyap'],
+      [0.175*edges.eDet, 'Post-Lyapunov', 'η_L < η < η_H', 'postL'],
+      [0.35*edges.eDet, 'Post-Lyapunov', 'η_L < η < η_H', 'postL'],
+      [0.5*edges.eDet, 'Harmonic edge', 'η = η_H', 'harm'],
+      [0.7*edges.eDet, 'Post-harmonic', 'η > η_H', 'postH'],
+      [edges.eDet, 'Post-harmonic', 'η > η_H', 'postH'],
+    ] : [
+      [0.5*(edges.eMS+edges.eL), 'MS unstable', 'η<sub>MS</sub> &lt; η &lt; η<sub>L</sub>', 'msu'],
+      [edges.eL, 'Lyapunov edge', 'η = η<sub>L</sub>', 'lyap'],
+      [edges.eL + 0.35*gap, 'Post-Lyapunov', 'η<sub>L</sub> &lt; η &lt; η<sub>H</sub>', 'postL'],
+      [edges.eL + 0.72*gap, 'Post-Lyapunov', 'η<sub>L</sub> &lt; η &lt; η<sub>H</sub>', 'postL'],
+      [H, 'Harmonic edge', 'η = η<sub>H</sub>', 'harm'],
+      [H*1.12, 'Post-harmonic', 'η &gt; η<sub>H</sub>', 'postH'],
+      [H*1.34, 'Post-harmonic', 'η &gt; η<sub>H</sub>', 'postH'],
+    ];
+    etas.forEach(([eta, title, sub, kind], i) => {
+      const s = runCloud({...p, eta, npart: Math.min(2500, p.npart), steps: Math.min(5000, p.steps), burn: Math.min(1500, p.burn), seed: p.seed+20+i});
+      drawMini(strip, s, title, sub, kind);
+    });
+
+    // keep eta slider range consistent
+    const toS = eta => Math.round(1000 * (eta - etaLo) / (etaHi - etaLo));
+    const fromS = s => etaLo + (etaHi - etaLo) * s/1000;
+    $('eta_s').value = String(Math.max(0, Math.min(1000, toS(p.eta))));
+    $('eta_cap').innerHTML =
+      `range [${fmt(etaLo)}, ${fmt(etaHi)}] spanning η<sub>MS</sub>=${fmt(edges.eMS)} · η<sub>L</sub>=${fmt(edges.eL)}` +
+      (Number.isFinite(eH) ? ` · $\\hat\\eta_H$=${fmt(eH)}` : '');
+    typesetMath($('eta_cap'));
+
+  } finally {
+    busy = false;
+  }
+}
+
+/* ===================== Wire controls ===================== */
+syncSlider('mu', 'mu_s',
+  x => Math.round(x*100),
+  s => (s/100));
+syncSlider('v', 'v_s',
+  x => Math.round(x*200),
+  s => s/200);
+// sliders span [-5, 5] so α, β can flip sign (sub- vs super-quartic / confining vs anti-confining)
+syncSlider('alpha', 'alpha_s',
+  x => Math.max(-200, Math.min(200, Math.round(x*40))),
+  s => s/40);
+syncSlider('beta', 'beta_s',
+  x => Math.max(-200, Math.min(200, Math.round(x*40))),
+  s => s/40);
+syncSlider('sigma', 'sigma_s',
+  x => Math.round(x*400),
+  s => s/400);
+
+syncSlider('eps', 'eps_s',
+  x => Math.max(1, Math.min(200, Math.round(x*1000))),
+  s => s/1000);
+syncSlider('h_low', 'h_low_s',
+  x => Math.max(0, Math.min(100, Math.round(x*100))),
+  s => s/100);
+
+$('eta_s').addEventListener('input', () => {
+  // map slider using last edges if available
+  const p = readParams();
+  const e = lastEdges || computeEdges(p);
+  const {etaLo, etaHi} = etaSliderRange(e, p.law);
+  $('eta').value = String(+(etaLo + (etaHi-etaLo)*($('eta_s').value/1000)).toFixed(4));
+  schedule();
+});
+$('eta').addEventListener('change', schedule);
+$('law').addEventListener('change', schedule);
+['npart','steps','burn','seed'].forEach(id => $(id).addEventListener('change', schedule));
+$('run').addEventListener('click', runAll);
+$('rerun').addEventListener('click', () => {
+  $('seed').value = String(((+$('seed').value) + 1) | 0);
+  runAll();
+});
+
+window.addEventListener('resize', () => { if(lastEdges) schedule(); });
+function boot(){
+  typesetMath(document.body);
+  runAll();
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(boot, 50));
+else setTimeout(boot, 50);
+
+</script>
+</body>
+</html>

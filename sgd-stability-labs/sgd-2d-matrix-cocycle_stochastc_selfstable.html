@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2-D SGD · minibatch Hessian</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+<style>
+:root{
+  --bg:#0b1120; --panel:#111a2e; --panel2:#0e1626; --line:#22304c; --line2:#1a2740;
+  --ink:#dbe4f3; --dim:#8ea0bf; --faint:#5c6d8c;
+  --z:#6fb3ff; --y:#ffb35c; --ms:#4fd8c4; --lyap:#b48cff; --ok:#5fd08a; --warn:#ffd166; --bad:#ff7a9e;
+  --serif:"STIX Two Text","Iowan Old Style",Georgia,"Times New Roman",serif;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14.5px;line-height:1.5}
+a{color:var(--z)}
+.wrap{max-width:1280px;margin:0 auto;padding:26px 22px 80px}
+header{border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:22px}
+.eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+h1{font-family:var(--serif);font-weight:600;font-size:28px;margin:8px 0 2px}
+h1 .thin{color:var(--dim);font-weight:400}
+.sub{color:var(--dim);max-width:78ch;margin:6px 0 12px}
+.eqbox{font-size:14.5px;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:12px 16px;overflow-x:auto}
+.eqbox .note{font-size:12.5px;color:var(--dim);margin-top:6px}
+.cols{display:grid;grid-template-columns:340px 1fr;gap:20px;align-items:start}
+@media(max-width:980px){.cols{grid-template-columns:1fr}}
+.side{position:sticky;top:14px;display:flex;flex-direction:column;gap:12px;max-height:calc(100vh - 28px);overflow-y:auto;padding-right:2px}
+@media(max-width:980px){.side{position:static;max-height:none}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 14px}
+.card h3{margin:0 0 9px;font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-weight:600}
+.row{display:flex;align-items:center;gap:8px;margin:7px 0}
+.row label{flex:0 0 118px;font-size:13px;color:var(--dim)}
+.row label .k{font-family:var(--serif);font-style:italic;color:var(--ink)}
+.row input[type=range]{flex:1;accent-color:var(--z);min-width:0}
+.row .val{font-family:var(--mono);font-size:12px;flex:0 0 64px;text-align:right}
+select,input[type=number]{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:4px 7px;font-family:var(--mono);font-size:12.5px}
+select{width:100%}
+button{background:#1b2a47;border:1px solid #2c4270;color:var(--ink);border-radius:8px;padding:7px 12px;font-family:var(--mono);font-size:12.5px;cursor:pointer}
+button:hover{background:#22345a}
+button.primary{background:#1e3f6e;border-color:#3a67a8}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{padding:5px 9px;font-size:11.5px;border-radius:999px;background:var(--panel2)}
+.note-sm{font-size:12.5px;color:var(--dim);margin-top:8px}
+.readouts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+@media(max-width:900px){.readouts{grid-template-columns:1fr}}
+.ro table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+.ro td{padding:2.5px 0;border-bottom:1px dotted var(--line2)}
+.ro td:last-child{text-align:right}
+.ro td:first-child{color:var(--dim)}
+.badge{display:inline-block;font-family:var(--mono);font-size:11px;border-radius:999px;padding:2px 9px;border:1px solid var(--line)}
+.badge.ok{color:var(--ok);border-color:#2c5a41}
+.badge.warn{color:var(--warn);border-color:#6b5a26}
+.badge.bad{color:var(--bad);border-color:#6b2c40}
+.corner{display:grid;grid-template-columns:1fr 130px;grid-template-rows:110px 1fr;gap:6px}
+.corner .cell{background:var(--panel2);border:1px solid var(--line2);border-radius:10px;overflow:hidden;position:relative}
+.corner canvas{display:block;width:100%;height:100%}
+.corner .lbl{position:absolute;font-family:var(--mono);font-size:10.5px;color:var(--faint);pointer-events:none}
+.plots2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.cellplot{background:var(--panel2);border:1px solid var(--line2);border-radius:10px;overflow:hidden;height:220px;position:relative}
+.cellplot canvas{display:block;width:100%;height:100%}
+.ladder{position:relative;height:14px;border-radius:4px;overflow:hidden;margin:6px 0 2px;border:1px solid var(--line2);background:var(--panel2)}
+.ladder .band{position:absolute;top:0;bottom:0}
+.ladder .tick{position:absolute;top:0;bottom:0;width:2px}
+.etalegend{display:flex;gap:10px;flex-wrap:wrap;font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:5px}
+.etalegend span i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.footer{margin-top:26px;color:var(--faint);font-size:12.5px;border-top:1px solid var(--line);padding-top:14px}
+.statusline{font-family:var(--mono);font-size:11.5px;color:var(--dim);min-height:16px;margin-top:6px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+html.embed header, html.embed .footer{display:none !important}
+html.embed, html.embed body{height:auto !important; overflow:visible !important}
+html.embed .wrap{padding:0 0 12px; max-width:none}
+html.embed .side{position:static !important; max-height:none !important; overflow:visible !important}
+</style>
+<script>
+(function(){
+  if(window.self!==window.top || /(?:^|[?&])embed=/.test(location.search))
+    document.documentElement.classList.add("embed");
+  function ping(){
+    if(window.parent===window) return;
+    const h=Math.ceil(Math.max(document.documentElement.scrollHeight, document.body.scrollHeight));
+    parent.postMessage({type:"lab-height", height:h}, "*");
+  }
+  addEventListener("load", ping);
+  addEventListener("resize", ping);
+  if(window.ResizeObserver) new ResizeObserver(ping).observe(document.documentElement);
+  [80,400,1200].forEach(t=>setTimeout(ping,t));
+})();
+</script>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="eyebrow">Interactive lab · 2-D minibatch SGD</div>
+  <h1>Where do the iterates go?</h1>
+  <p class="sub">
+    Draw a Gaussian dataset once. Each step picks a minibatch and multiplies by \(I-\eta H_t\).
+    Move \(\eta\) and \(B\), then press <b>Run</b>. The cloud is the iterate law; the left table says whether the linear map shrinks or grows.
+  </p>
+  <div class="eqbox">
+  $$x_{t+1}=(I-\eta H_t)\,x_t-\eta\Big(\tfrac{c_{4,t}}{6}\|x_t\|^2+\tfrac{c_{6,t}}{120}\|x_t\|^4\Big)x_t+\sigma\,\xi_t,
+  \qquad H_t=\frac1B\sum_{i\in\mathcal B_t}z_i z_i^\top,
+  \quad z_i\sim\mathcal N(0,\Sigma),\quad \Sigma=\mathrm{diag}(\mu_1,\mu_2)$$
+  <div class="note">
+    \(B=N\): full batch, \(H_t\) is fixed. \(B&lt;N\): \(H_t\) changes every step (matrices usually do not commute).
+    \(c_4,c_6\) can keep the cloud bounded even when the linear map expands. Color bar on \(\eta\): teal = mean-square stable, then Lyapunov edge, then past it.
+  </div>
+  </div>
+</header>
+
+<div class="cols">
+<div class="side">
+
+  <div class="card">
+    <h3>Presets</h3>
+    <div class="chips" id="presetChips"></div>
+    <div class="note-sm">Same data, different \(B\). Click one, then watch the cloud.</div>
+  </div>
+
+  <div class="card">
+    <h3>Step size</h3>
+    <div class="row"><label><span class="k">η</span></label>
+      <input type="range" id="eta" min="0.2" max="3.5" step="0.005" value="2.360">
+      <span class="val" id="etaV">2.500</span></div>
+    <div class="ladder" id="ladder"></div>
+    <div class="etalegend">
+      <span><i style="background:#123c3a"></i>mean-square stable</span>
+      <span><i style="background:#3a2d14"></i>to Lyapunov edge</span>
+      <span><i style="background:#3c2440"></i>to \(K_{-1/2}=1\)</span>
+      <span><i style="background:#47182b"></i>past the edge</span>
+      <span><i style="background:#7f92b3"></i>2/λ<sub>max</sub></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Data &amp; batch</h3>
+    <div class="row"><label>dataset <span class="k">N</span></label><input type="number" id="dataN" value="1024" min="32" max="10000" step="32" style="width:90px"></div>
+    <div class="row"><label>batch knob <span class="k">B</span></label><input type="range" id="batchRange" value="398" min="1" max="1024" step="1"><span class="val" id="batchV">398</span></div>
+    <div class="row"><label>exact <span class="k">B</span></label><input type="number" id="batch" value="398" min="1" max="1024" step="1" style="width:90px"></div>
+    <div class="row"><label>Σ eig. <span class="k">μ₁</span></label><input type="range" id="mu1" min="0.3" max="2.5" step="0.01" value="1.0"><span class="val" id="mu1V"></span></div>
+    <div class="row"><label>Σ eig. <span class="k">μ₂</span></label><input type="range" id="mu2" min="0.1" max="2.0" step="0.01" value="0.45"><span class="val" id="mu2V"></span></div>
+    <div class="note-sm">One fixed dataset \(z_i\sim\mathcal N(0,\mathrm{diag}(\mu_1,\mu_2))\). \(B=N\) is full batch.</div>
+  </div>
+
+  <div class="card">
+    <h3>Stochastic self-stabilization</h3>
+    <div class="row"><label>mean <span class="k">c̄₄</span></label><input type="range" id="c4" min="-2" max="1" step="0.01" value="-0.27"><span class="val" id="c4V"></span></div>
+    <div class="row"><label>std. <span class="k">s₄</span></label><input type="range" id="c4sd" min="0" max="1.5" step="0.01" value="0.15"><span class="val" id="c4sdV"></span></div>
+    <div class="row"><label>mean <span class="k">c̄₆</span></label><input type="range" id="c6" min="0" max="30" step="0.1" value="0"><span class="val" id="c6V"></span></div>
+    <div class="row"><label>std. <span class="k">s₆</span></label><input type="range" id="c6sd" min="0" max="15" step="0.1" value="0"><span class="val" id="c6sdV"></span></div>
+    <div class="row"><label>noise <span class="k">σ</span></label><input type="range" id="sig" min="0" max="0.15" step="0.002" value="0.02"><span class="val" id="sigV"></span></div>
+    <div class="row"><label>drift clip</label><input type="range" id="clip" min="0.5" max="8" step="0.1" value="5.0"><span class="val" id="clipV"></span></div>
+    <div class="note-sm">Nonlinear pull that can bound the cloud. \(\sigma\) is extra noise.</div>
+  </div>
+
+  <div class="card">
+    <h3>Simulation</h3>
+    <div class="grid2">
+      <div class="row"><label style="flex-basis:64px">particles</label><input type="number" id="Np" value="3000" min="200" max="20000" step="200" style="width:74px"></div>
+      <div class="row"><label style="flex-basis:64px">steps T</label><input type="number" id="Tn" value="2500" min="400" max="20000" step="100" style="width:74px"></div>
+      <div class="row"><label style="flex-basis:64px">burn-in</label><input type="number" id="Bn" value="1200" min="0" max="19000" step="100" style="width:74px"></div>
+      <div class="row"><label style="flex-basis:64px">seed</label><input type="number" id="seed" value="7" min="0" step="1" style="width:74px"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:9px;flex-wrap:wrap">
+      <button class="primary" id="runBtn">Run</button>
+      <button id="reseedBtn">re-seed &amp; run</button>
+    </div>
+    <div class="statusline" id="status"></div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="readouts">
+    <div class="card ro">
+      <h3>Linear map</h3>
+      <table>
+        <tr><td>2/λ<sub>max</sub></td><td id="ro2m"></td></tr>
+        <tr><td>Lyapunov χ</td><td id="roChi"></td></tr>
+        <tr><td>mean-square ρ</td><td id="roMom1"></td></tr>
+        <tr><td>K<sub>−1/2</sub></td><td id="roKneg"></td></tr>
+        <tr><td>edges η<sub>MS</sub>, η<sub>L</sub>, η<sub>−1/2</sub></td><td id="roEta1"></td></tr>
+        <tr><td>mean batch eigs</td><td id="roEig"></td></tr>
+        <tr><td>commutator</td><td id="roComm"></td></tr>
+        <tr><td>mean ‖M₄‖</td><td id="roMk"></td></tr>
+        <tr><td>P(‖M₄‖ &gt; 1)</td><td id="roMkP"></td></tr>
+        <tr><td>B / N</td><td id="roBatch"></td></tr>
+        <tr><td>Hessians</td><td id="roSrc"></td></tr>
+      </table>
+      <div style="margin-top:7px"><span class="badge" id="regLin">—</span></div>
+    </div>
+    <div class="card ro">
+      <h3>Harmonic stability</h3>
+      <div class="note-sm" style="margin:0 0 8px">
+        \(H(h)=\mathbb{E}\big[|1-h\,\lambda_{1,B}|^{-1}\big]\) along the top batch eigenvalue.
+        \(H&gt;1\) still returns mass to \(0\). Harmonically unstable when \(H&lt;1\).
+      </div>
+      <table>
+        <tr><td>H(h)</td><td id="roH"></td></tr>
+        <tr><td>K<sub>−1/2</sub></td><td id="roKneg2"></td></tr>
+        <tr><td>h<sub>H</sub> (crossing)</td><td id="roHH"></td></tr>
+      </table>
+      <div style="margin-top:7px"><span class="badge" id="regHarm">—</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Iterate cloud p(x₁, x₂)</h3>
+    <div class="corner">
+      <div class="cell" style="grid-column:1;grid-row:1"><canvas id="cvMx"></canvas><span class="lbl" style="left:8px;top:6px">marginal p(x₁)</span></div>
+      <div class="cell" style="grid-column:2;grid-row:1;display:flex;align-items:center;justify-content:center;padding:8px">
+        <div style="font-family:var(--mono);font-size:10.5px;color:var(--faint);text-align:center">fixed axes<br>not rotating with H<sub>t</sub></div>
+      </div>
+      <div class="cell" style="grid-column:1;grid-row:2;aspect-ratio:1.25"><canvas id="cvJoint"></canvas>
+        <span class="lbl" style="left:8px;bottom:6px">x₁ →</span>
+        <span class="lbl" style="left:6px;top:6px">↑ x₂</span></div>
+      <div class="cell" style="grid-column:2;grid-row:2"><canvas id="cvMy"></canvas><span class="lbl" style="right:8px;top:6px">p(x₂)</span></div>
+    </div>
+    <div class="note-sm" id="rangeNote"></div>
+  </div>
+
+  <div class="footer">
+    Same dataset and Hessian pool for the cloud and \(\chi\). \(\chi&lt;0\) contracts; \(\chi&gt;0\) expands.
+  </div>
+</div>
+</div>
+</div>
+
+<script>
+"use strict";
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function makeGauss(rnd){let has=false,c=0;return function(){if(has){has=false;return c}
+  let u=0,v=0,s=0;do{u=2*rnd()-1;v=2*rnd()-1;s=u*u+v*v}while(s>=1||s===0);
+  const m=Math.sqrt(-2*Math.log(s)/s);c=v*m;has=true;return u*m}}
+function mixedSeed(seed,tag){
+  let x=((seed|0)^(tag|0))>>>0;
+  x=Math.imul(x^(x>>>16),0x7feb352d); x=Math.imul(x^(x>>>15),0x846ca68b);
+  return (x^(x>>>16))>>>0 || 1;
+}
+function applyIH(x,y,h11,h12,h22,eta){
+  return {x:(1-eta*h11)*x-eta*h12*y, y:-eta*h12*x+(1-eta*h22)*y};
+}
+function frobeniusOpNorm2x2(a11,a12,a21,a22){
+  const b11=a11*a11+a21*a21, b12=a11*a12+a21*a22, b22=a12*a12+a22*a22;
+  const tr=b11+b22, det=b11*b22-b12*b12, disc=Math.max(0,tr*tr-4*det);
+  return Math.sqrt(0.5*(tr+Math.sqrt(disc)));
+}
+function matrixIH(h11,h12,h22,eta){
+  return {a11:1-eta*h11,a12:-eta*h12,a21:-eta*h12,a22:1-eta*h22};
+}
+const $=id=>document.getElementById(id);
+const P={}, S={running:false,snapX:null,snapY:null,nSnap:0,traj1:null,traj2:null,trajC4:null,trajC6:null,escapes:0,
+  chiLin:NaN,chiNl:NaN,kNeg:NaN,mssRho:NaN,mkMean:NaN,mkP:NaN,nlValid:true,
+  c4Mean:NaN,c4Std:NaN,c6Mean:NaN,c6Std:NaN,c6Neg:NaN,model:null,runEta:NaN};
+let MODEL=null;
+function readParams(){
+  P.eta=+$("eta").value; P.mu1=+$("mu1").value; P.mu2=+$("mu2").value;
+  P.dataN=Math.max(32,+$("dataN").value|0);
+  P.batch=Math.max(1,Math.min(P.dataN,+$("batch").value|0));
+  $("dataN").value=P.dataN;
+  $("batch").max=P.dataN; $("batch").value=P.batch;
+  $("batchRange").max=P.dataN; $("batchRange").value=P.batch;
+  P.c4=+$("c4").value; P.c4sd=+$("c4sd").value;
+  P.c6=+$("c6").value; P.c6sd=+$("c6sd").value;
+  P.sig=+$("sig").value; P.clip=+$("clip").value;
+  P.N=Math.max(100,+$("Np").value|0); P.T=Math.max(200,+$("Tn").value|0);
+  P.burn=Math.min(+$("Bn").value|0,P.T-50); P.seed=+$("seed").value|0;
+}
+function fmt(x,d=3){return (!isFinite(x))?"—":(+x).toFixed(d)}
+function syncLabels(){
+  readParams();
+  $("etaV").textContent=(+$("eta").value).toFixed(3);
+  $("mu1V").textContent=(+$("mu1").value).toFixed(2);
+  $("mu2V").textContent=(+$("mu2").value).toFixed(2);
+  $("batchV").textContent=P.batch===P.dataN?"full":String(P.batch);
+  $("c4V").textContent=(+$("c4").value).toFixed(2);
+  $("c4sdV").textContent=(+$("c4sd").value).toFixed(2);
+  $("c6V").textContent=(+$("c6").value).toFixed(1);
+  $("c6sdV").textContent=(+$("c6sd").value).toFixed(1);
+  $("sigV").textContent=(+$("sig").value).toFixed(3);
+  $("clipV").textContent=(+$("clip").value).toFixed(1);
+  const model=ensureModel();
+  $("ro2m").textContent=fmt(2/model.fullEigMax);
+  const rho=mssRho(P.eta,model.pool);
+  $("roMom1").textContent=fmt(rho,3)+(rho<1?"  (<1)":"  (>1)");
+  const dm=directionalMoments(P.eta,model.pool,1800,mixedSeed(P.seed,0x5151));
+  $("roKneg").textContent=fmt(dm.kneg,3)+(dm.kneg<1?"  (<1)":"  (>1)");
+  paintHarmonic(harmonicH(P.eta,model.pool),dm.kneg,model.edges.neg);
+  $("roEta1").textContent=fmt(model.edges.ms,3)+" · "+fmt(model.edges.L,3)+" · "+fmt(model.edges.neg,3);
+  $("roEig").textContent=fmt(model.meanEig1,3)+" · "+fmt(model.meanEig2,3);
+  $("roComm").textContent=fmt(model.commutator,4);
+  $("roBatch").textContent=P.batch+" / "+P.dataN+(P.batch===P.dataN?"  (full)":"");
+  $("roSrc").textContent=model.pool.n.toLocaleString()+" subset Hessians";
+  drawLadder();
+}
+function parentData(N,mu1,mu2,seed){
+  const rnd=mulberry32(mixedSeed(seed,0x13579)), gauss=makeGauss(rnd);
+  const x=new Float64Array(N),y=new Float64Array(N),s1=Math.sqrt(mu1),s2=Math.sqrt(mu2);
+  let h11=0,h12=0,h22=0;
+  for(let i=0;i<N;i++){x[i]=s1*gauss();y[i]=s2*gauss();h11+=x[i]*x[i];h12+=x[i]*y[i];h22+=y[i]*y[i]}
+  return {x,y,N,h11:h11/N,h12:h12/N,h22:h22/N};
+}
+function subsetH(parent,B,rnd){
+  const N=parent.N;
+  if(B>=N)return {h11:parent.h11,h12:parent.h12,h22:parent.h22};
+  const chosen=new Set(); let h11=0,h12=0,h22=0;
+  for(let j=N-B;j<N;j++){
+    const t=(rnd()*(j+1))|0, idx=chosen.has(t)?j:t; chosen.add(idx);
+    const x=parent.x[idx],y=parent.y[idx];h11+=x*x;h12+=x*y;h22+=y*y;
+  }
+  return {h11:h11/B,h12:h12/B,h22:h22/B};
+}
+function batchPool(parent,B,seed){
+  const n=B>=parent.N?1:Math.min(4096,Math.max(512,Math.floor(131072/B)));
+  const h11=new Float64Array(n),h12=new Float64Array(n),h22=new Float64Array(n);
+  const rnd=mulberry32(mixedSeed(seed,0x2468a));
+  for(let i=0;i<n;i++){const h=subsetH(parent,B,rnd);h11[i]=h.h11;h12[i]=h.h12;h22[i]=h.h22}
+  return {h11,h12,h22,n,B};
+}
+function eigs2(h11,h12,h22){
+  const tr=h11+h22,disc=Math.sqrt(Math.max(0,(h11-h22)*(h11-h22)+4*h12*h12));
+  return [0.5*(tr+disc),0.5*(tr-disc)];
+}
+function poolSummary(pool){
+  let e1=0,e2=0,comm=0,nc=0;
+  for(let i=0;i<pool.n;i++){
+    const e=eigs2(pool.h11[i],pool.h12[i],pool.h22[i]);e1+=e[0];e2+=e[1];
+    if(pool.n>1){const j=(i*37+17)%pool.n;
+      const c=pool.h12[j]*(pool.h11[i]-pool.h22[i])+pool.h12[i]*(pool.h22[j]-pool.h11[j]);
+      const ni=Math.sqrt(pool.h11[i]**2+2*pool.h12[i]**2+pool.h22[i]**2);
+      const nj=Math.sqrt(pool.h11[j]**2+2*pool.h12[j]**2+pool.h22[j]**2);
+      if(ni*nj>1e-14){comm+=Math.SQRT2*Math.abs(c)/(ni*nj);nc++}
+    }
+  }
+  return {meanEig1:e1/pool.n,meanEig2:e2/pool.n,commutator:nc?comm/nc:0};
+}
+function harmonicH(eta,pool){
+  let s=0;
+  for(let i=0;i<pool.n;i++){
+    const lam=eigs2(pool.h11[i],pool.h12[i],pool.h22[i])[0];
+    s+=1/Math.max(Math.abs(1-eta*lam),1e-3);
+  }
+  return s/pool.n;
+}
+function paintHarmonic(H,kneg,hH){
+  const hEl=$("roH"),kEl=$("roKneg2"),hhEl=$("roHH"),badge=$("regHarm");
+  if(hEl) hEl.textContent=fmt(H,3)+(H<1?"  (<1, unstable)":"  (>1)");
+  if(kEl) kEl.textContent=fmt(kneg,3)+(kneg<1?"  (<1)":"  (>1)");
+  if(hhEl) hhEl.textContent=fmt(hH,3);
+  if(!badge) return;
+  if(!(H>0)){badge.textContent="—";badge.className="badge";return}
+  if(H>1){badge.textContent="harmonically stable · H>1";badge.className="badge ok"}
+  else{badge.textContent="harmonically unstable · H<1";badge.className="badge bad"}
+}
+function mssRho(eta,pool){
+  let p=0,q=0,r=0,s=0,t=0,u=0;
+  for(let i=0;i<pool.n;i++){
+    const a=1-eta*pool.h11[i],b=-eta*pool.h12[i],d=1-eta*pool.h22[i];
+    p+=a*a;q+=a*b;r+=b*b;s+=a*d+b*b;t+=b*d;u+=d*d;
+  }
+  const n=pool.n,rt=Math.SQRT2;
+  const M=[[p/n,rt*q/n,r/n],[rt*q/n,s/n,rt*t/n],[r/n,rt*t/n,u/n]];
+  let v=[Math.SQRT1_2,0,Math.SQRT1_2],rho=1;
+  for(let k=0;k<80;k++){
+    const w=[M[0][0]*v[0]+M[0][1]*v[1]+M[0][2]*v[2],M[1][0]*v[0]+M[1][1]*v[1]+M[1][2]*v[2],M[2][0]*v[0]+M[2][1]*v[1]+M[2][2]*v[2]];
+    const z=Math.hypot(w[0],w[1],w[2]);if(!(z>0))return 0;v=[w[0]/z,w[1]/z,w[2]/z];
+  }
+  const w=[M[0][0]*v[0]+M[0][1]*v[1]+M[0][2]*v[2],M[1][0]*v[0]+M[1][1]*v[1]+M[1][2]*v[2],M[2][0]*v[0]+M[2][1]*v[1]+M[2][2]*v[2]];
+  rho=v[0]*w[0]+v[1]*w[1]+v[2]*w[2];return rho;
+}
+function directionalMoments(eta,pool,steps=3500,seed=11){
+  const rnd=mulberry32(seed),gauss=makeGauss(rnd);let x=gauss(),y=gauss(),z=Math.hypot(x,y);x/=z;y/=z;
+  let chi=0,kneg=0,g2=0,n=0;
+  for(let t=0;t<steps+300;t++){
+    const j=(rnd()*pool.n)|0,o=applyIH(x,y,pool.h11[j],pool.h12[j],pool.h22[j],eta),g=Math.hypot(o.x,o.y);
+    if(!(g>1e-14)||!isFinite(g)){x=1;y=0;continue}x=o.x/g;y=o.y/g;
+    if(t>=300){chi+=Math.log(g);kneg+=Math.pow(g,-0.5);g2+=g*g;n++}
+  }
+  return {chi:chi/n,kneg:kneg/n,g2:g2/n};
+}
+function firstCrossing(fn,start,end,up){
+  const m=42;let a=start,fa=fn(a);
+  for(let i=1;i<=m;i++){
+    const b=start+(end-start)*i/m,fb=fn(b),hit=up?(fa<0&&fb>=0):(fa>0&&fb<=0);
+    if(hit){let lo=a,hi=b;for(let k=0;k<24;k++){const mid=(lo+hi)/2,fm=fn(mid);if(up?(fm<0):(fm>0))lo=mid;else hi=mid}return (lo+hi)/2}
+    a=b;fa=fb;
+  }
+  return NaN;
+}
+function modelKey(){return [P.seed,P.dataN,P.batch,P.mu1.toFixed(4),P.mu2.toFixed(4)].join("|")}
+function ensureModel(){
+  const key=modelKey();if(MODEL&&MODEL.key===key)return MODEL;
+  const parent=parentData(P.dataN,P.mu1,P.mu2,P.seed),pool=batchPool(parent,P.batch,P.seed),sum=poolSummary(pool);
+  const fullEig=eigs2(parent.h11,parent.h12,parent.h22),maxEta=+$("eta").max;
+  const ms=firstCrossing(e=>mssRho(e,pool)-1,0.015,maxEta,true);
+  const seed=mixedSeed(P.seed,0x5151);
+  const L=firstCrossing(e=>directionalMoments(e,pool,2200,seed).chi,0.015,maxEta,true);
+  const negStart=isFinite(L)?Math.max(0.015,L-0.15):0.015;
+  const neg=firstCrossing(e=>directionalMoments(e,pool,2200,seed).kneg-1,negStart,maxEta,false);
+  MODEL={key,parent,pool,fullEigMax:fullEig[0],meanEig1:sum.meanEig1,meanEig2:sum.meanEig2,commutator:sum.commutator,edges:{ms,L,neg}};
+  return MODEL;
+}
+function drawLadder(){
+  const el=$("ladder"); if(!el) return; el.innerHTML="";
+  const mx=+$("eta").max,eta=+$("eta").value,model=ensureModel(),e0=2/model.fullEigMax,E=model.edges;
+  const X=e=>Math.min(100,Math.max(0,100*e/mx));
+  const H=isFinite(E.neg)?E.neg:mx;
+  const L=isFinite(E.L)?E.L:e0;
+  const bands=[["#123c3a",0,E.ms],["#3a2d14",E.ms,L],["#3c2440",L,H],["#47182b",H,mx]];
+  for(const[c,a,b] of bands){
+    if(!(b>a)) continue;
+    const d=document.createElement("div"); d.className="band";
+    d.style.left=X(a)+"%"; d.style.width=Math.max(0,X(b)-X(a))+"%"; d.style.background=c; el.appendChild(d);
+  }
+  for(const[c,e] of [["#4fd8c4",E.ms],["#7f92b3",e0],["#b48cff",E.L],["#c23b3b",E.neg],["#fff",eta]]){
+    if(!isFinite(e) || e>mx) continue;
+    const t=document.createElement("div"); t.className="tick"; t.style.left=X(e)+"%"; t.style.background=c; el.appendChild(t);
+  }
+}
+let runToken=0;
+function runSim(){
+  readParams(); syncLabels();
+  const tok=++runToken;
+  const model=ensureModel(),pool=model.pool;
+  const rndH=mulberry32(mixedSeed(P.seed,0xaaaa)),rndInit=mulberry32(mixedSeed(P.seed,0xbbbb)),gaussInit=makeGauss(rndInit);
+  const rndNoise=mulberry32(mixedSeed(P.seed,0xcccc)),gaussNoise=makeGauss(rndNoise);
+  const rndCoeff=mulberry32(mixedSeed(P.seed,0xdddd)),gaussCoeff=makeGauss(rndCoeff);
+  const N=P.N,T=P.T,burn=P.burn,eta=P.eta,clip=P.clip,sig=P.sig;
+  const x=new Float64Array(N), y=new Float64Array(N);
+  const vx=new Float64Array(N), vy=new Float64Array(N);
+  const A11=new Float64Array(N), A12=new Float64Array(N), A21=new Float64Array(N), A22=new Float64Array(N);
+  for(let i=0;i<N;i++){
+    x[i]=0.25*gaussInit(); y[i]=0.25*gaussInit();
+    let ax=gaussInit(), ay=gaussInit(), an=Math.hypot(ax,ay); vx[i]=ax/an; vy[i]=ay/an;
+    A11[i]=1; A12[i]=0; A21[i]=0; A22[i]=1;
+  }
+  const nKeep=Math.min(100,T-burn), thin=Math.max(1,Math.floor((T-burn)/nKeep));
+  const cap=Math.min(500000,N*Math.ceil((T-burn)/thin));
+  S.snapX=new Float32Array(cap); S.snapY=new Float32Array(cap); S.nSnap=0;
+  S.traj1=new Float64Array(T); S.traj2=new Float64Array(T);
+  S.trajC4=new Float64Array(T); S.trajC6=new Float64Array(T); S.escapes=0;
+  S.runEta=eta;S.model=model;S.nlValid=true;
+  let v1=1,v2=0.2,lt=0,ltn=0,t=0,chiAcc=0,negAcc=0,chiCnt=0,mkSum=0,mkGt=0,mkN=0;
+  let c4Acc=0,c4Sq=0,c6Acc=0,c6Sq=0,c6Neg=0,cN=0;
+  S.running=true; $("status").textContent="running…";
+  const CH=Math.max(8,Math.floor(22000/N*40));
+  function chunk(){
+    if(tok!==runToken)return;
+    const tEnd=Math.min(T,t+CH);
+    for(;t<tEnd;t++){
+      const isSnap=t>=burn && (t-burn)%thin===0;
+      for(let i=0;i<N;i++){
+        const j=(rndH()*pool.n)|0,h11=pool.h11[j],h12=pool.h12[j],h22=pool.h22[j];
+        const c4t=P.c4+P.c4sd*gaussCoeff(),c6t=P.c6+P.c6sd*gaussCoeff();
+        const c46=c4t/6,c6120=c6t/120;
+        const xi=x[i], yi=y[i];
+        const lin=applyIH(xi,yi,h11,h12,h22,eta);
+        const r2=xi*xi+yi*yi;
+        let fx=eta*(c46*r2+c6120*r2*r2)*xi;
+        let fy=eta*(c46*r2+c6120*r2*r2)*yi;
+        let clipped=false,fn=Math.hypot(fx,fy);
+        if(fn>clip){const sc=clip/fn;fx*=sc;fy*=sc;clipped=true}
+        let xn=lin.x-fx+(sig?sig*gaussNoise():0);
+        let yn=lin.y-fy+(sig?sig*gaussNoise():0);
+        if(!isFinite(xn)||!isFinite(yn)||Math.hypot(xn,yn)>25){xn=0.15*gaussNoise();yn=0.15*gaussNoise();S.escapes++;if(i===0)S.nlValid=false}
+        if(t>=burn){
+          c4Acc+=c4t;c4Sq+=c4t*c4t;c6Acc+=c6t;c6Sq+=c6t*c6t;if(c6t<0)c6Neg++;cN++;
+          const o=applyIH(vx[i],vy[i],h11,h12,h22,eta);
+          const nn=Math.hypot(o.x,o.y);
+          if(nn>1e-14&&isFinite(nn)){chiAcc+=Math.log(nn);negAcc+=Math.pow(nn,-0.5);chiCnt++;vx[i]=o.x/nn;vy[i]=o.y/nn}
+          else{let ax=gaussInit(),ay=gaussInit(),an=Math.hypot(ax,ay);vx[i]=ax/an;vy[i]=ay/an}
+          const M=matrixIH(h11,h12,h22,eta);
+          const n11=M.a11*A11[i]+M.a12*A21[i], n12=M.a11*A12[i]+M.a12*A22[i];
+          const n21=M.a21*A11[i]+M.a22*A21[i], n22=M.a21*A12[i]+M.a22*A22[i];
+          A11[i]=n11; A12[i]=n12; A21[i]=n21; A22[i]=n22;
+          if(((t-burn+1)%4)===0){
+            const nrm=frobeniusOpNorm2x2(A11[i],A12[i],A21[i],A22[i]);
+            mkSum+=nrm; if(nrm>1) mkGt++; mkN++;
+            A11[i]=1; A12[i]=0; A21[i]=0; A22[i]=1;
+          }
+        }
+        if(i===0){
+          S.traj1[t]=xn; S.traj2[t]=yn;
+          S.trajC4[t]=c4t; S.trajC6[t]=c6t;
+          if(!clipped){
+            const M=matrixIH(h11,h12,h22,eta),q=c46*r2+c6120*r2*r2;
+            const beta=eta*(c4t/3+(c6t/30)*r2),stiff=eta*q;
+            const a11=M.a11-stiff-beta*xi*xi,a12=M.a12-beta*xi*yi;
+            const a21=M.a21-beta*xi*yi,a22=M.a22-stiff-beta*yi*yi;
+            const w1=a11*v1+a12*v2, w2=a21*v1+a22*v2, nrm=Math.hypot(w1,w2);
+            if(nrm>1e-300&&isFinite(nrm)){v1=w1/nrm;v2=w2/nrm;if(t>=burn){lt+=Math.log(nrm);ltn++}}
+          }else S.nlValid=false;
+        }
+        x[i]=xn; y[i]=yn;
+        if(isSnap && S.nSnap<S.snapX.length){
+          S.snapX[S.nSnap]=xn; S.snapY[S.nSnap]=yn;
+          S.nSnap++;
+        }
+      }
+    }
+    $("status").textContent="running… step "+t+" / "+T;
+    if(t<T) requestAnimationFrame(chunk);
+    else{
+      S.chiNl=S.nlValid&&ltn>0?lt/ltn:NaN;
+      S.chiLin=chiCnt>0?chiAcc/chiCnt:NaN;
+      S.kNeg=chiCnt>0?negAcc/chiCnt:NaN;
+      S.mssRho=mssRho(eta,pool);
+      S.mkMean=mkN>0?mkSum/mkN:NaN;
+      S.mkP=mkN>0?mkGt/mkN:NaN;
+      S.c4Mean=cN?c4Acc/cN:NaN;S.c6Mean=cN?c6Acc/cN:NaN;
+      S.c4Std=cN?Math.sqrt(Math.max(0,c4Sq/cN-S.c4Mean*S.c4Mean)):NaN;
+      S.c6Std=cN?Math.sqrt(Math.max(0,c6Sq/cN-S.c6Mean*S.c6Mean)):NaN;
+      S.c6Neg=cN?c6Neg/cN:NaN;
+      S.running=false;
+      finish();
+    }
+  }
+  requestAnimationFrame(chunk);
+}
+function percentile(arr,n,q){
+  const stride=Math.max(1,Math.floor(n/80000)), m=Math.floor(n/stride);
+  const b=new Float64Array(m); for(let i=0;i<m;i++) b[i]=arr[i*stride];
+  b.sort(); return b[Math.max(0,Math.min(m-1,Math.floor(q*m)))];
+}
+function histCounts(arr,n,lo,hi,nb){
+  const h=new Float64Array(nb), s=nb/(hi-lo);
+  for(let i=0;i<n;i++){const v=arr[i]; if(v<lo||v>=hi||!isFinite(v))continue; h[(s*(v-lo))|0]++}
+  return h;
+}
+function smooth3(h){const o=new Float64Array(h.length);for(let i=0;i<h.length;i++)o[i]=(h[i-1]||0)*.25+h[i]*.5+(h[i+1]||0)*.25;return o}
+function countModes(h){
+  const s=smooth3(smooth3(h)); const mx=Math.max(...s,1e-12); let n=0;
+  for(let i=2;i<s.length-2;i++) if(s[i]>s[i-1]&&s[i]>=s[i+1]&&s[i]>0.08*mx) n++;
+  return n;
+}
+function sizeCanvas(cv){const r=cv.getBoundingClientRect(),d=devicePixelRatio||1;
+  cv.width=Math.max(2,r.width*d)|0;cv.height=Math.max(2,r.height*d)|0;return d}
+function paintLinReadout(){
+  $("roChi").textContent=fmt(S.chiLin,4)+(S.chiLin<0?"  (contracting)":"  (expanding)");
+  $("roMom1").textContent=fmt(S.mssRho,3)+(S.mssRho<1?"  (<1)":"  (>1)");
+  $("roKneg").textContent=fmt(S.kNeg,3)+(S.kNeg<1?"  (<1)":"  (>1)");
+  $("roMk").textContent=fmt(S.mkMean,3);
+  $("roMkP").textContent=isFinite(S.mkP)?(100*S.mkP).toFixed(0)+"%":"—";
+  const badge=$("regLin");
+  if(S.mssRho<1){badge.textContent="mean-square stable";badge.className="badge ok"}
+  else if(S.chiLin<-0.02){badge.textContent="unstable in mean square, still contracting";badge.className="badge warn"}
+  else if(S.chiLin<0.02){badge.textContent="near Lyapunov edge";badge.className="badge warn"}
+  else if(S.kNeg>1){badge.textContent="expanding · K₋₁/₂>1";badge.className="badge bad"}
+  else{badge.textContent="expanding · K₋₁/₂<1";badge.className="badge bad"}
+}
+function finish(){
+  const n=S.nSnap; if(n<20){$("status").textContent="no samples";return}
+  syncLabels();
+  paintLinReadout();
+  const R=new Float64Array(n); let nLog=0, mlog=0;
+  const logR=new Float64Array(n);
+  for(let i=0;i<n;i++){const r=Math.hypot(S.snapX[i],S.snapY[i]); R[i]=r; if(r>1e-12){logR[nLog]=Math.log10(r); mlog+=logR[nLog]; nLog++}}
+  const med=percentile(R,n,0.5); mlog=nLog?mlog/nLog:NaN;
+  paintHarmonic(harmonicH(P.eta,ensureModel().pool),S.kNeg,ensureModel().edges.neg);
+  renderCorner();
+  $("status").textContent="done · "+n.toLocaleString()+" (x,H_t) pairs · χ_lin="+fmt(S.chiLin,3)+" · H="+fmt(harmonicH(P.eta,ensureModel().pool),3);
+}
+function renderCorner(){
+  const n=S.nSnap;
+  const lo1=percentile(S.snapX,n,0.01), hi1=percentile(S.snapX,n,0.99);
+  const lo2=percentile(S.snapY,n,0.01), hi2=percentile(S.snapY,n,0.99);
+  const pad1=0.08*(hi1-lo1+1e-6), pad2=0.08*(hi2-lo2+1e-6);
+  const x0=lo1-pad1,x1=hi1+pad1,y0=lo2-pad2,y1=hi2+pad2;
+  $("rangeNote").textContent="range x₁∈["+fmt(x0)+","+fmt(x1)+"], x₂∈["+fmt(y0)+","+fmt(y1)+"]";
+  const cv=$("cvJoint"), d=sizeCanvas(cv), ctx=cv.getContext("2d");
+  const W=cv.width,H=cv.height, nx=90, ny=70, grid=new Float64Array(nx*ny);
+  const sx=nx/(x1-x0), sy=ny/(y1-y0);
+  for(let i=0;i<n;i++){const ix=(sx*(S.snapX[i]-x0))|0, iy=(sy*(y1-S.snapY[i]))|0;
+    if(ix>=0&&ix<nx&&iy>=0&&iy<ny) grid[iy*nx+ix]++}
+  let mx=0; for(let i=0;i<grid.length;i++) if(grid[i]>mx) mx=grid[i];
+  const img=ctx.createImageData(W,H);
+  for(let py=0;py<H;py++) for(let px=0;px<W;px++){
+    const ix=(px/W*nx)|0, iy=(py/H*ny)|0;
+    const t=mx?Math.log1p(grid[iy*nx+ix])/Math.log1p(mx):0;
+    const r=20+200*t*t, g=30+90*t*(1-t)*4, b=55+170*(1-t)*t*2+40*t;
+    const o=(py*W+px)*4; img.data[o]=r; img.data[o+1]=g; img.data[o+2]=b; img.data[o+3]=255;
+  }
+  ctx.putImageData(img,0,0);
+  ctx.strokeStyle="rgba(255,255,255,.25)"; ctx.lineWidth=1*d;
+  if(x0<0&&x1>0){const px=(0-x0)/(x1-x0)*W; ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,H);ctx.stroke()}
+  if(y0<0&&y1>0){const py=(y1-0)/(y1-y0)*H; ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W,py);ctx.stroke()}
+  drawMarginal($("cvMx"), histCounts(S.snapX,n,x0,x1,80), "#6fb3ff", false);
+  drawMarginal($("cvMy"), histCounts(S.snapY,n,y0,y1,80), "#ffb35c", true);
+}
+function drawMarginal(cv,h,color,vertical){
+  const d=sizeCanvas(cv), ctx=cv.getContext("2d"), W=cv.width, H=cv.height;
+  ctx.clearRect(0,0,W,H); const mx=Math.max(...h,1e-12); ctx.fillStyle=color; ctx.globalAlpha=0.85;
+  if(!vertical){const bw=W/h.length; for(let i=0;i<h.length;i++){const hh=h[i]/mx*(H-4*d); ctx.fillRect(i*bw, H-hh, Math.ceil(bw)+1, hh)}}
+  else{const bh=H/h.length; for(let i=0;i<h.length;i++){const ww=h[i]/mx*(W-4*d); ctx.fillRect(0, i*bh, ww, Math.ceil(bh)+1)}}
+  ctx.globalAlpha=1;
+}
+function renderR(){
+  const n=S.nSnap, R=new Float64Array(n);
+  for(let i=0;i<n;i++) R[i]=Math.hypot(S.snapX[i],S.snapY[i]);
+  drawHist($("cvR"), histCounts(R,n,0,percentile(R,n,0.995)+1e-6,50), "#4fd8c4", "‖x‖");
+}
+function renderLogR(){
+  const L=[]; for(let i=0;i<S.nSnap;i++){const r=Math.hypot(S.snapX[i],S.snapY[i]); if(r>1e-12) L.push(Math.log10(r))}
+  const a=new Float64Array(L); if(a.length<10)return;
+  const lo=percentile(a,a.length,0.01), hi=percentile(a,a.length,0.99)+1e-6;
+  drawHist($("cvLogR"), histCounts(a,a.length,lo,hi,50), "#b48cff", "log₁₀‖x‖");
+}
+function drawHist(cv,h,color,xlabel){
+  const d=sizeCanvas(cv), ctx=cv.getContext("2d"), W=cv.width, H=cv.height;
+  ctx.clearRect(0,0,W,H); const mx=Math.max(...h,1e-12), bw=W/h.length;
+  ctx.fillStyle=color;
+  for(let i=0;i<h.length;i++){const hh=h[i]/mx*(H-22*d); ctx.fillRect(i*bw, H-hh-14*d, Math.ceil(bw)+1, hh)}
+  ctx.fillStyle="#5c6d8c"; ctx.font=(11*d)+"px ui-monospace,monospace"; ctx.fillText(xlabel, 8*d, H-4*d);
+}
+function renderTraj(){ drawTraj($("cvT1"), S.traj1, "#6fb3ff", "x₁"); drawTraj($("cvT2"), S.traj2, "#ffb35c", "x₂"); }
+function renderCoeffs(){drawTraj($("cvC4"),S.trajC4,"#b48cff","c₄,t",false);drawTraj($("cvC6"),S.trajC6,"#4fd8c4","c₆,t",false)}
+function drawTraj(cv,arr,color,name,parity=true){
+  if(!arr)return;
+  const d=sizeCanvas(cv), ctx=cv.getContext("2d"), W=cv.width, H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  const T=arr.length, take=Math.min(400,T), off=T-take;
+  let lo=Infinity,hi=-Infinity;
+  for(let i=off;i<T;i++){const v=arr[i]; if(!isFinite(v))continue; if(v<lo)lo=v; if(v>hi)hi=v}
+  if(!isFinite(lo))return;
+  const pad=0.1*(hi-lo+1e-6); lo-=pad; hi+=pad;
+  ctx.strokeStyle="rgba(255,255,255,.15)"; ctx.beginPath();
+  if(lo<0&&hi>0){const y0=(hi-0)/(hi-lo)*H; ctx.moveTo(0,y0);ctx.lineTo(W,y0);ctx.stroke()}
+  ctx.strokeStyle=color; ctx.lineWidth=1.2*d; ctx.beginPath();
+  for(let i=0;i<take;i++){const v=arr[off+i]; if(!isFinite(v))continue;
+    const px=i/(take-1)*W, py=(hi-v)/(hi-lo)*H; if(i===0)ctx.moveTo(px,py); else ctx.lineTo(px,py)}
+  ctx.stroke();
+  for(let i=Math.max(0,take-80);i<take;i++){const v=arr[off+i]; if(!isFinite(v))continue;
+    ctx.fillStyle=parity?((i%2===0)?"#7be0a3":"#ffb35c"):color;
+    ctx.beginPath(); ctx.arc(i/(take-1)*W,(hi-v)/(hi-lo)*H,2.2*d,0,6.3); ctx.fill()}
+  ctx.fillStyle="#5c6d8c"; ctx.font=(11*d)+"px ui-monospace,monospace"; ctx.fillText(name, 8*d, 14*d);
+}
+function runProductCurve(){
+  readParams(); syncLabels();
+  const model=ensureModel(),pool=model.pool,parent=model.parent,rnd=mulberry32(mixedSeed(P.seed,0x9999));
+  const Kmax=12,trials=300,mCur=new Array(Kmax).fill(0),mFull=new Array(Kmax).fill(0);
+  const F=matrixIH(parent.h11,parent.h12,parent.h22,P.eta);
+  for(let t=0;t<trials;t++){
+    let a11=1,a12=0,a21=0,a22=1,b11=1,b12=0,b21=0,b22=1;
+    for(let k=0;k<Kmax;k++){
+      const j=(rnd()*pool.n)|0,M=matrixIH(pool.h11[j],pool.h12[j],pool.h22[j],P.eta);
+      const n11=M.a11*a11+M.a12*a21,n12=M.a11*a12+M.a12*a22,n21=M.a21*a11+M.a22*a21,n22=M.a21*a12+M.a22*a22;
+      a11=n11;a12=n12;a21=n21;a22=n22;
+      const q11=F.a11*b11+F.a12*b21,q12=F.a11*b12+F.a12*b22,q21=F.a21*b11+F.a22*b21,q22=F.a21*b12+F.a22*b22;
+      b11=q11;b12=q12;b21=q21;b22=q22;
+      mCur[k]+=frobeniusOpNorm2x2(a11,a12,a21,a22);mFull[k]+=frobeniusOpNorm2x2(b11,b12,b21,b22);
+    }
+  }
+  for(let k=0;k<Kmax;k++){mCur[k]/=trials;mFull[k]/=trials}
+  const cv=$("cvProd"), d=sizeCanvas(cv), ctx=cv.getContext("2d"), W=cv.width, H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  const ymax=Math.max(...mCur,...mFull,1.05);
+  const X=i=>(i/(Kmax-1))*(W-50*d)+30*d, Y=v=>(1-v/ymax)*(H-36*d)+12*d;
+  ctx.strokeStyle="rgba(255,255,255,.2)"; ctx.beginPath(); ctx.moveTo(30*d,Y(1)); ctx.lineTo(W-10*d,Y(1)); ctx.stroke();
+  function line(arr,col){ctx.strokeStyle=col; ctx.lineWidth=1.8*d; ctx.beginPath();
+    for(let i=0;i<arr.length;i++){const x=X(i),y=Y(arr[i]); if(i===0)ctx.moveTo(x,y); else ctx.lineTo(x,y)} ctx.stroke();
+    ctx.fillStyle=col; for(let i=0;i<arr.length;i++){ctx.beginPath();ctx.arc(X(i),Y(arr[i]),2.5*d,0,6.3);ctx.fill()}}
+  line(mFull,"#8ea0bf"); line(mCur,"#6fb3ff");
+  ctx.fillStyle="#5c6d8c"; ctx.font=(11*d)+"px ui-monospace,monospace";
+  ctx.fillText("gray: repeated H_full   blue: minibatch product   reference: ‖M‖=1",30*d,H-8*d);
+  $("status").textContent="product curve ready";
+}
+const PRESETS=[
+  {id:"rank1",name:"rank-one batches (B=1)",set:{dataN:1024,batch:1,eta:1.0,mu1:1,mu2:0.45,c4:-0.2,c4sd:0.1,c6:10,c6sd:0.5,sig:0.02,clip:5}},
+  {id:"small",name:"small batch (B=4)",set:{dataN:1024,batch:4,eta:1.4,mu1:1,mu2:0.45,c4:-0.3,c4sd:0.15,c6:8,c6sd:0.5,sig:0.02,clip:5}},
+  {id:"medium",name:"medium batch (B=32)",set:{dataN:1024,batch:32,eta:1.7,mu1:1,mu2:0.45,c4:-0.4,c4sd:0.15,c6:8,c6sd:0.5,sig:0.02,clip:5}},
+  {id:"large",name:"large batch (B=256)",set:{dataN:1024,batch:256,eta:1.95,mu1:1,mu2:0.45,c4:-0.7,c4sd:0.15,c6:6,c6sd:0.5,sig:0.02,clip:6}},
+  {id:"full",name:"full batch (B=N)",set:{dataN:1024,batch:1024,eta:2.25,mu1:1,mu2:0.45,c4:-1.1,c4sd:0.1,c6:5,c6sd:0.3,sig:0.02,clip:6}},
+  {id:"isotropic",name:"isotropic covariance",set:{dataN:1024,batch:32,eta:2.1,mu1:1,mu2:1,c4:-0.9,c4sd:0.15,c6:7,c6sd:0.5,sig:0.02,clip:5}},
+  {id:"coeff-noise",name:"strong c₄/c₆ noise",set:{dataN:1024,batch:32,eta:1.7,mu1:1,mu2:0.45,c4:-0.4,c4sd:0.6,c6:8,c6sd:3,sig:0.02,clip:5}},
+  {id:"det-coeff",name:"deterministic c₄/c₆",set:{dataN:1024,batch:32,eta:1.7,mu1:1,mu2:0.45,c4:-0.4,c4sd:0,c6:8,c6sd:0,sig:0.02,clip:5}},
+  {id:"linear",name:"linear only",set:{dataN:1024,batch:32,eta:1.7,mu1:1,mu2:0.45,c4:0,c4sd:0,c6:0,c6sd:0,sig:0.04,clip:5}},
+];
+function applyPreset(p){
+  const s=p.set;
+  $("dataN").value=s.dataN;$("batch").value=s.batch;$("eta").value=s.eta;
+  $("mu1").value=s.mu1;$("mu2").value=s.mu2;
+  $("c4").value=s.c4; $("c4sd").value=s.c4sd;
+  $("c6").value=s.c6; $("c6sd").value=s.c6sd; $("sig").value=s.sig;
+  if(s.clip!=null) $("clip").value=s.clip;
+  MODEL=null;
+  syncLabels(); runSim();
+}
+function presetFromURL(){
+  const q=new URLSearchParams(location.search);
+  const id=(q.get("preset")||"").trim();
+  if(!id) return null;
+  return PRESETS.find(p=>p.id===id) || null;
+}
+function wire(){
+  const chips=$("presetChips");
+  for(const p of PRESETS){const b=document.createElement("button"); b.textContent=p.name; b.onclick=()=>applyPreset(p); chips.appendChild(b)}
+  for(const id of ["eta","c4","c4sd","c6","c6sd","sig","clip"]) $(id).addEventListener("input",syncLabels);
+  for(const id of ["mu1","mu2"]){$(id).addEventListener("input",()=>{MODEL=null;syncLabels()})}
+  $("dataN").addEventListener("change",()=>{MODEL=null;syncLabels()});
+  $("batch").addEventListener("change",()=>{MODEL=null;syncLabels()});
+  $("batchRange").addEventListener("input",()=>{
+    $("batch").value=$("batchRange").value;
+    $("batchV").textContent=$("batchRange").value;
+  });
+  $("batchRange").addEventListener("change",()=>{MODEL=null;syncLabels()});
+  $("runBtn").onclick=()=>runSim();
+  $("reseedBtn").onclick=()=>{$("seed").value=(+$("seed").value+1)|0;MODEL=null;runSim()};
+  syncLabels();
+  const fromURL=presetFromURL();
+  if(fromURL) applyPreset(fromURL);
+  else runSim();
+}
+document.addEventListener("DOMContentLoaded",()=>{
+  wire();
+  if(window.renderMathInElement) renderMathInElement(document.body,{delimiters:[{left:"$$",right:"$$",display:true},{left:"\\(",right:"\\)",display:false}]});
+});
+</script>
+</body>
+</html>

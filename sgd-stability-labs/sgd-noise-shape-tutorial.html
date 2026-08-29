@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>A simple tutorial on SGD stability</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+        onload="if(window.boot) window.boot();"></script>
+<style>
+:root{
+  --bg:#fbf8f2; --paper:#fffdf8; --ink:#1b1916; --soft:#5a564e; --line:#e6e0d4;
+  --blue:#1f6fd2; --green:#1a7a3a; --red:#c23b3b; --amber:#b07a12;
+  --softbg:#f3efe6; --ok:#e8f4ea; --bad:#f8e8e8; --note:#eef4fb;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#121110; --paper:#1c1b19; --ink:#f3efe6; --soft:#b8b3a8; --line:#2d2b27;
+    --blue:#6aa4ea; --green:#54b36d; --red:#e07070; --amber:#e0b04a;
+    --softbg:#262420; --ok:#1d2a20; --bad:#2d1d1d; --note:#1b2430;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font:18px/1.65 Georgia, "Times New Roman", serif;
+}
+.wrap{max-width:720px; margin:0 auto; padding:36px 22px 80px}
+.eyebrow{font:13px/1.3 ui-sans-serif,system-ui,sans-serif; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--soft); margin:0 0 10px}
+h1{font-size:34px; line-height:1.15; font-weight:650; margin:0 0 10px}
+.lede{color:var(--soft); font-size:19px; margin:0 0 28px}
+h2{font-size:26px; margin:42px 0 12px; padding-top:10px; border-top:1px solid var(--line)}
+h3{font-size:20px; margin:22px 0 8px}
+p{margin:0 0 12px}
+.eq{
+  background:var(--paper); border:1px solid var(--line); border-radius:12px;
+  padding:12px 16px; margin:14px 0; overflow-x:auto; text-align:center;
+}
+.say{
+  background:var(--note); border-left:4px solid var(--blue);
+  padding:10px 14px; margin:16px 0; border-radius:0 10px 10px 0;
+}
+.say b{color:var(--ink)}
+.widget{
+  background:var(--paper); border:1px solid var(--line); border-radius:16px;
+  padding:16px; margin:18px 0 8px;
+}
+.widget .ask{font:600 14px/1.3 ui-sans-serif,system-ui,sans-serif; color:var(--soft);
+  letter-spacing:.04em; text-transform:uppercase; margin:0 0 10px}
+.row{display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin:8px 0 2px}
+.row span, .row label{font:15px ui-sans-serif,system-ui,sans-serif; color:var(--soft)}
+.row b{font:15px ui-monospace,Menlo,Consolas,monospace; color:var(--ink)}
+input[type=range]{width:100%; accent-color:var(--blue); margin:0 0 8px}
+select{width:100%; padding:7px 8px; border:1px solid var(--line); border-radius:8px;
+  background:var(--bg); color:var(--ink); font:15px ui-sans-serif,system-ui,sans-serif; margin:0 0 8px}
+.btns{display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 4px}
+button{
+  border:1px solid var(--line); background:var(--bg); color:var(--ink);
+  border-radius:999px; padding:7px 13px; font:14px ui-sans-serif,system-ui,sans-serif; cursor:pointer;
+}
+button.pri{background:var(--blue); color:#fff; border-color:transparent}
+button:hover{border-color:var(--blue)}
+button.pri:hover{filter:brightness(1.06)}
+canvas{width:100%; display:block; margin-top:8px; border-radius:10px}
+.answer{margin-top:10px; padding:10px 12px; border-radius:10px; font:16px/1.5 Georgia,serif}
+.answer.ok{background:var(--ok)}
+.answer.bad{background:var(--bad)}
+.answer.warn{background:#f7efd8}
+@media (prefers-color-scheme: dark){.answer.warn{background:#332a14}}
+.tiny{font:14px/1.45 ui-sans-serif,system-ui,sans-serif; color:var(--soft); margin:6px 0 0}
+a{color:var(--blue)}
+footer{margin-top:40px; padding-top:16px; border-top:1px solid var(--line);
+  font:14px/1.5 ui-sans-serif,system-ui,sans-serif; color:var(--soft)}
+.toc{display:flex; flex-wrap:wrap; gap:8px; margin:0 0 8px}
+.toc a{
+  font:14px ui-sans-serif,system-ui,sans-serif; text-decoration:none;
+  border:1px solid var(--line); border-radius:999px; padding:5px 11px; color:var(--soft);
+}
+.toc a:hover{border-color:var(--blue); color:var(--blue)}
+.strip{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+@media(max-width:640px){.strip{grid-template-columns:1fr 1fr}}
+.strip .mini{border:1px solid var(--line);border-radius:10px;padding:6px;background:var(--bg)}
+.strip .mini .ttl{font:12px ui-sans-serif,system-ui,sans-serif;color:var(--soft);margin:0 0 4px}
+.strip .mini .ttl b{color:var(--ink)}
+.labs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:16px 0}
+@media(max-width:720px){.labs{grid-template-columns:1fr}}
+.labcard{display:block;text-decoration:none;color:inherit;border:1px solid var(--line);
+  border-radius:14px;padding:12px 14px;background:var(--paper)}
+.labcard:hover{border-color:var(--blue)}
+.labcard .k{font:12px ui-sans-serif,system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--soft)}
+.labcard h4{margin:4px 0 6px;font-size:17px}
+.labcard p{margin:0;font-size:15px;color:var(--soft)}
+.split2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:640px){.split2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<p class="eyebrow">A short tutorial · six lessons</p>
+<h1>How stable is SGD?</h1>
+<p class="lede">We will walk through this slowly. First the SGD update. Then a simple quadratic. Then a real network. Then the tools we need once the linear theory runs out.</p>
+<div class="toc">
+  <a href="#l1">1. SGD</a>
+  <a href="#l2">2. A quadratic</a>
+  <a href="#l3">3. The tails</a>
+  <a href="#l4">4. A real network</a>
+  <a href="#l5">5. 1-D / 2-D labs</a>
+  <a href="#l6">6. Past Lyapunov</a>
+</div>
+
+<!-- ===================== LESSON 1 ===================== -->
+<h2 id="l1">Lesson 1. Neural networks are trained with SGD</h2>
+
+<p>That is the first fact. We have parameters \(\theta\) and a loss \(L\). At every step we pick a random mini-batch \(B_t\) and take one step downhill on that batch:</p>
+
+<div class="eq">\[ \theta_{t+1} \;=\; \theta_t \;-\; \eta\,\nabla L_{B_t}(\theta_t) \]</div>
+
+<p>\(\eta\) is the step size (the learning rate). \(B_t\) is a new random batch each time. That is all SGD is.</p>
+
+<p>Now the natural question: <b>is this stable?</b> Do the parameters stay near a minimum, or do they run away?</p>
+
+<p>A real neural network is too messy to answer that. So we study the simplest loss that still has curvature: a quadratic.</p>
+
+<!-- ===================== LESSON 2 ===================== -->
+<h2 id="l2">Lesson 2. A quadratic loss, and what “stable” means</h2>
+
+<h3>The simple model</h3>
+<p>Let \(x\) be how far we are from the minimum. Each batch sees a slightly different curvature \(h_t\). Think of \(h_t\) as “how steep that batch is.” We sample it from a distribution. The easiest example is a Gaussian:</p>
+
+<div class="eq">\[ h_t \;\sim\; \mathcal N(\mu,\, v) \]</div>
+
+<p>\(\mu\) is the average curvature. \(v\) is how much the batches disagree. Smaller batches mean larger \(v\). If we used the whole dataset every time, \(v=0\).</p>
+
+<p>The loss on that batch is a simple quadratic, plus a little noise:</p>
+
+<div class="eq">\[ L_{B_t}(x) \;=\; \tfrac12 h_t\, x^2 \;-\; \xi_t\, x \]</div>
+
+<p>Plug this into SGD. The update becomes very short:</p>
+
+<div class="eq">\[ x_{t+1} \;=\; (1-\eta h_t)\, x_t \;+\; \eta\sigma\zeta_t \]</div>
+
+<p>Read it in words. Every step we multiply the current position by a <i>random</i> number \(1-\eta h_t\), then add a small Gaussian kick. That is the whole model. A stochastic quadratic. Nothing else.</p>
+
+<h3>What do we mean by “stable”?</h3>
+<p>The iterate \(x_t\) is now random, so we need a metric. The usual one is: the average squared distance from the minimum stays bounded.</p>
+
+<div class="eq">\[ \mathbb E[x_t^2]\ \text{ stays finite for all } t \]</div>
+
+<p>People call this <b>mean-square stability</b>.</p>
+
+<p>Why the square? Because it is easy to compute. Square the update. The noise term has mean zero, so it drops out of the cross term, and we get:</p>
+
+<div class="eq">\[ \mathbb E[x_{t+1}^2] \;=\; \underbrace{\mathbb E[(1-\eta h)^2]}_{m_2(\eta)}\; \mathbb E[x_t^2] \;+\; \eta^2\sigma^2 \]</div>
+
+<p>Each step multiplies the mean square by one number, \(m_2(\eta)\). If that number is less than 1, the mean square settles down. If it is bigger than 1, the mean square grows forever.</p>
+
+<p>And \(m_2\) has a closed form. It is less than 1 exactly when</p>
+
+<div class="eq">\[ \eta \;<\; \eta_{\mathrm{MS}} \;=\; \frac{2\mu}{\mu^2+v} \]</div>
+
+<div class="say">
+  Notice: if the batches all agree (\(v=0\)), this is the classical number \(\eta&lt;2/\mu\). Once batches disagree, the allowed step size gets <b>strictly smaller</b>. That is the first fact.
+</div>
+
+<p>Try it. Leave the curvature Gaussian. Move the step size across the line \(\eta_{\mathrm{MS}}\). Watch the histogram of \(x\).</p>
+
+<div class="widget">
+  <p class="ask">Does the mean square stay bounded?</p>
+  <div class="row"><span>average curvature \(\mu\)</span><b id="aMu">1.00</b></div>
+  <input id="sMu" type="range" min="0.6" max="1.4" step="0.01" value="1">
+  <div class="row"><span>batch disagreement \(v\)</span><b id="aV">0.04</b></div>
+  <input id="sV" type="range" min="0" max="0.25" step="0.005" value="0.04">
+  <div class="row"><span>step size \(\eta\)</span><b id="aEta">1.80</b></div>
+  <input id="sEta" type="range" min="0.4" max="2.3" step="0.01" value="1.80">
+  <div class="btns">
+    <button id="btnBelow">just below the line</button>
+    <button id="btnAbove">just above the line</button>
+    <button class="pri" id="btnRun1">Run again</button>
+  </div>
+  <div class="answer" id="ans1"></div>
+  <canvas id="c1" width="680" height="250" aria-label="histogram of iterates"></canvas>
+  <p class="tiny">This is a histogram of \(x\) after many steps. Below the line it stays peaked near zero. Above the line the mass spreads out.</p>
+</div>
+
+<h3>Stability is not one number. It is a spectrum.</h3>
+<p>The square was only one choice. We could have asked whether \(\mathbb E|x_t|\) stays finite, or \(\mathbb E|x_t|^4\), or \(\mathbb E|x_t|^{1/2}\).</p>
+<p>For this simple update, each of those questions has its own answer. Write</p>
+
+<div class="eq">\[ m_q(\eta) \;=\; \mathbb E\,|1-\eta h|^{q} \]</div>
+
+<p>The \(q\)-th moment of \(x_t\) stays finite when \(m_q(\eta)&lt;1\), and blows up when \(m_q(\eta)&gt;1\). So each \(q\) has its own step-size threshold.</p>
+<p>Two named cases:</p>
+
+<div class="eq">\[
+\begin{aligned}
+\text{mean-square stability:}&\quad \mathbb E|1-\eta h|^{2} \;&lt;&\; 1\\[4pt]
+\text{harmonic stability:}&\quad \mathbb E|1-\eta h|^{-1} \;&lt;&\; 1
+\end{aligned}
+\]</div>
+
+<p>Mean-square asks about the <i>second</i> moment. Harmonic asks about the <i>inverse</i> moment: how often the random multiplier is small, i.e. how often a step pulls \(x\) back toward zero.</p>
+
+<div class="say">
+  If the step size is below the mean-square line, every moment of order \(2\) or less is stable. Moments of higher order can already be unstable. That is what “spectrum” means: we do not get a yes/no. We get a list of which averages survive and which ones blow up.
+</div>
+
+<p>The picture below is the same Gaussian as above. Move \(\eta\). The blue curve is \(m_q\). Moments under the red line \(m_q=1\) are the stable ones.</p>
+
+<div class="widget">
+  <p class="ask">Which moments are still finite?</p>
+  <div class="row"><span>step size \(\eta\)</span><b id="bEta">1.96</b></div>
+  <input id="sEta2" type="range" min="1.2" max="2.15" step="0.005" value="1.96">
+  <div class="btns">
+    <button id="btnMS">mean-square edge</button>
+    <button id="btnMean">classical edge \(2/\mu\)</button>
+  </div>
+  <div class="answer" id="ans2"></div>
+  <canvas id="c2" width="680" height="250" aria-label="which moments are stable"></canvas>
+  <p class="tiny">The green mark is \(\kappa\): the last stable moment. Everything to the right of it diverges.</p>
+</div>
+
+<!-- ===================== LESSON 3 ===================== -->
+<h2 id="l3">Lesson 3. What does the distribution of \(x\) look like?</h2>
+
+<p>So far we only asked whether averages stay finite. We can also ask: after many steps, what does a histogram of \(x\) look like?</p>
+
+<p>When a typical run still contracts, the iterates settle into a fixed shape. That shape is <b>not a Gaussian</b>. Sometimes a few unlucky batches multiply \(x\) up several times in a row. Those rare runs make a heavy tail.</p>
+
+<p>The 1-D Kesten theorem says exactly how heavy. Find the number \(\kappa&gt;0\) that solves</p>
+
+<div class="eq">\[ \mathbb E\,|1-\eta h|^{\kappa} \;=\; 1 \]</div>
+
+<p>Then the tail of the stationary law is a power law with that same \(\kappa\):</p>
+
+<div class="eq">\[ \mathbb P(|x|&gt;t) \;\approx\; C\, t^{-\kappa} \qquad\text{for large }t. \]</div>
+
+<div class="say">
+  This \(\kappa\) is the same number as in Lesson 2. A tail \(t^{-\kappa}\) has a finite \(q\)-th moment exactly when \(q&lt;\kappa\). So “which moments survive” and “how heavy is the tail” are one fact.
+</div>
+
+<p>Change the step size, or change how the batch curvature is sampled. The histogram changes. That is all this lesson is.</p>
+
+<div class="widget">
+  <p class="ask">Change the curvature and the step size. Watch the histogram.</p>
+  <div class="row"><label for="sLaw">how we sample the batch curvature \(h\)</label></div>
+  <select id="sLaw">
+    <option value="gaussian" selected>Gaussian</option>
+    <option value="uniform">uniform</option>
+    <option value="twopoint">two-point (only two possible curvatures)</option>
+  </select>
+  <div class="row"><span>step size \(\eta\)</span><b id="cEta">1.96</b></div>
+  <input id="sEta3" type="range" min="1.2" max="2.08" step="0.005" value="1.96">
+  <div class="btns">
+    <button id="btnK2">light tail (\(\kappa=2\))</button>
+    <button id="btnK1">heavier (\(\kappa=1\))</button>
+    <button class="pri" id="btnRun3">Run</button>
+  </div>
+  <div class="answer" id="ans3"></div>
+  <canvas id="c3" width="680" height="250" aria-label="histogram of iterates"></canvas>
+  <p class="tiny">The peak stays near zero. The tails get heavier as \(\eta\) grows. For more laws and a longer run, open the <a href="sgd-1d-bimodality.html">1-D lab</a>.</p>
+</div>
+
+<!-- ===================== LESSON 4 ===================== -->
+<h2 id="l4">Lesson 4. Is this all? What about a neural network?</h2>
+
+<p>Everything so far was a one-dimensional quadratic. A real network has thousands of parameters and a loss that is not a bowl. So a fair question is:</p>
+
+<div class="say">
+  <b>Can the stability of SGD tell us what happens in a neural network?</b>
+  Or did we just solve a toy problem?
+</div>
+
+<p>Here is one experiment. Take a trained network and freeze a checkpoint \(\theta_\star\). Keep running plain SGD from there. After each step, look only along the <i>sharpest</i> direction: the top eigenvector \(u_1\) of the Hessian. Call that one number</p>
+
+<div class="eq">\[ z_t \;=\; \langle \theta_t-\theta_\star,\; u_1\rangle \]</div>
+
+<p>If the quadratic story were the whole story, then past the Lyapunov line this coordinate should run away. It does not. It sits in a stationary cloud. Raise the step size further and that cloud becomes two lobes.</p>
+
+<p>The pictures below are not a simulation of a toy map. They are a real 2-block transformer, continued with full-batch SGD, then projected onto \(u_1\). The number \(\eta\lambda_1\) is the step size times the largest curvature. The classical edge is \(2\). The Lyapunov number \(\chi_{\mathrm{lin}}=\mathbb E\log|1-\eta\, u_1^\top H_B u_1|\) turns positive at the same place.</p>
+
+<div class="widget">
+  <p class="ask">A real network, probed along its sharpest direction</p>
+  <div class="row"><span>step size \(\eta\lambda_1\)</span><b id="nnEta">2.50</b></div>
+  <input id="sNN" type="range" min="0" max="7" step="1" value="5">
+  <div class="btns">
+    <button id="btnNNpre">below Lyapunov</button>
+    <button id="btnNNL">just past Lyapunov</button>
+    <button id="btnNNbim">bimodal</button>
+  </div>
+  <div class="answer" id="ansNN">loading the recorded experiment…</div>
+  <canvas id="cNN" width="680" height="240" aria-label="network probe along u1"></canvas>
+  <p class="tiny">Histogram of \(z=\langle\theta-\theta_\star,u_1\rangle\). Same checkpoint, only the step size changes.</p>
+  <div class="strip" id="nnStrip"></div>
+  <p class="tiny">Raising \(\eta\) walks through the whole range: a spike at zero, then a spread cloud past Lyapunov, then two lobes. Open the <a href="nn_checkpoint_lab/nn-checkpoint-cocycle.html">checkpoint lab</a> for other nets and batch sizes.</p>
+</div>
+
+<!-- ===================== LESSON 5 ===================== -->
+<h2 id="l5">Lesson 5. The same picture in 1-D and 2-D</h2>
+
+<p>The network probe is high-dimensional. The same family of histograms appears in the small models you already have as labs. Those models add the next term in the loss — a cubic and a quintic — so the iterate is pulled back when it gets large. That is why a stationary cloud can exist <i>past</i> the Lyapunov line.</p>
+
+<div class="eq">\[ x_{t+1} \;=\; (1-\eta h_t)\,x_t \;+\; \alpha x_t^{3} \;-\; \beta x_t^{5} \;+\; \sigma\zeta_t \]</div>
+
+<p>The first term is the quadratic we already know. The extra powers are the self-stabilization. Move \(\eta\) from the mean-square line, through Lyapunov, into the two-lobe region.</p>
+
+<div class="widget">
+  <p class="ask">1-D experiment · the scalar map from the lab</p>
+  <div class="row"><span>step size \(\eta\)</span><b id="dEta">2.55</b></div>
+  <input id="sEta1d" type="range" min="1.70" max="2.90" step="0.01" value="2.55">
+  <div class="btns">
+    <button id="btn1dMS">mean-square</button>
+    <button id="btn1dL">Lyapunov</button>
+    <button id="btn1dB">two lobes</button>
+    <button class="pri" id="btn1dRun">Run</button>
+  </div>
+  <div class="answer" id="ans1d"></div>
+  <canvas id="c1d" width="680" height="240" aria-label="1D self-stabilizing histogram"></canvas>
+  <div class="strip" id="strip1d"></div>
+  <p class="tiny">Full controls — curvature law, \(\alpha\), \(\beta\) — live in the <a href="sgd-1d-bimodality.html">1-D lab</a>.</p>
+</div>
+
+<p>In two dimensions there is a sharp coordinate \(z\) and a tangent coordinate \(y\). The same walk: a blob at the origin, then a cloud past Lyapunov, then two lobes along the sharp axis.</p>
+
+<div class="widget">
+  <p class="ask">2-D experiment · sharp axis \(z\), tangent axis \(y\)</p>
+  <div class="row"><span>step size \(\eta\)</span><b id="eEta">2.50</b></div>
+  <input id="sEta2d" type="range" min="1.70" max="2.80" step="0.01" value="2.50">
+  <div class="btns">
+    <button id="btn2dPre">below the edge</button>
+    <button id="btn2dBim">two lobes</button>
+    <button class="pri" id="btn2dRun">Run</button>
+  </div>
+  <div class="answer" id="ans2d"></div>
+  <div class="split2">
+    <canvas id="c2d" width="340" height="240" aria-label="2D cloud"></canvas>
+    <canvas id="c2dz" width="340" height="240" aria-label="sharp marginal"></canvas>
+  </div>
+  <p class="tiny">Left: the \((z,y)\) cloud. Right: the histogram along the sharp axis. Full coupling knobs are in the <a href="sgd-2d-bimodality.html">2-D lab</a>. The rotating-axes version is the <a href="sgd-2d-matrix-cocycle.html">matrix lab</a>.</p>
+</div>
+
+<div class="say"><b>Start from the quadratic.</b> <a href="sgd-stability-labs-tutorial.html">SGD on a quadratic, and what breaks after</a> builds the classical picture, shows a network that violates it, then walks the three labs.</div>
+
+<div class="labs">
+  <a class="labcard" href="sgd-1d-bimodality.html">
+    <div class="k">1-D</div>
+    <h4>Scalar cocycle</h4>
+    <p>One curvature, cubic and quintic return, the Fig.&nbsp;1 strip.</p>
+  </a>
+  <a class="labcard" href="sgd-2d-bimodality.html">
+    <div class="k">2-D</div>
+    <h4>Sharp–tangent</h4>
+    <p>Two coupled coordinates. Lobes live on the sharp axis.</p>
+  </a>
+  <a class="labcard" href="nn_checkpoint_lab/nn-checkpoint-cocycle.html">
+    <div class="k">a real net</div>
+    <h4>Checkpoint probe</h4>
+    <p>SGD from \(\theta_\star\), occupancy in the top Hessian plane.</p>
+  </a>
+</div>
+
+<!-- ===================== LESSON 6 ===================== -->
+<h2 id="l6">Lesson 6. Do we have tools past the Lyapunov line?</h2>
+
+<p>At the Lyapunov line the typical one-step gain stops contracting:</p>
+
+<div class="eq">\[ \chi(\eta) \;=\; \mathbb E\log|1-\eta h| \;\ge\; 0 \]</div>
+
+<p>Kesten’s theorem needs \(\chi&lt;0\). So the linear / quadratic theory <b>stops</b> here. It cannot tell us the shape of the cloud we just saw in the network, or in the 1-D and 2-D labs.</p>
+
+<div class="say">
+  <b>Do we have any tool left</b> for SGD once we cross Lyapunov? Yes — but we have to look at a different kind of moment. Not “is \(x\) large on average?”, but “how often is the gain <i>small</i>?”
+</div>
+
+<p>That is a <b>negative</b> moment. For \(\alpha&gt;0\),</p>
+
+<div class="eq">\[ m_{-\alpha}(\eta) \;=\; \mathbb E\,|1-\eta h|^{-\alpha} \]</div>
+
+<p>If \(m_{-\alpha}&lt;1\), the gain is small often enough that a typical excursion is pulled back toward zero. Two named cases:</p>
+
+<div class="eq">\[
+\begin{aligned}
+\text{negative-moment stability:}&\quad \mathbb E\,|1-\eta h|^{-\alpha} \;&lt;&\; 1
+\quad\text{for some }\alpha&gt;0\\[6pt]
+\text{harmonic stability:}&\quad \mathbb E\,|1-\eta h|^{-1} \;&lt;&\; 1
+\end{aligned}
+\]</div>
+
+<p>Harmonic is just the case \(\alpha=1\). It is the last of these inverse-moment edges. In the labs, the two-lobe histograms appear around there — not at the Lyapunov line, and not at the mean-square line.</p>
+
+<div class="say">
+  Self-stabilization is what keeps the iterate from escaping after Lyapunov. Negative-moment / harmonic stability is the linear diagnostic for when the return toward zero becomes rare. Together they are the language for the bimodal region.
+</div>
+
+<div class="widget">
+  <p class="ask">The inverse-moment spectrum</p>
+  <div class="row"><span>step size \(\eta\)</span><b id="fEta">2.12</b></div>
+  <input id="sEtaH" type="range" min="1.80" max="2.25" step="0.005" value="2.12">
+  <div class="row"><label for="sLawH">curvature law</label></div>
+  <select id="sLawH">
+    <option value="twopoint" selected>two-point (harmonic is a real number)</option>
+    <option value="gaussian">Gaussian (literal harmonic diverges)</option>
+  </select>
+  <div class="answer" id="ansH"></div>
+  <canvas id="cH" width="680" height="250" aria-label="negative moments"></canvas>
+  <p class="tiny">Now \(q\) runs through negative values too. The crossing of \(m_q=1\) on the left is the inverse-moment edge. For a Gaussian the curve blows up as \(q\to-1\), which is why the papers use a fractional \(\alpha&lt;1\).</p>
+</div>
+
+<p>That is the end of this first pass. The quadratic gave us a spectrum of ordinary moments and a Kesten tail. A real network, and the 1-D / 2-D maps, keep a stationary shape past Lyapunov. The new tools there are self-stabilization and the inverse moments — mean-square, then Lyapunov, then negative-moment, then harmonic.</p>
+
+<footer>
+  <a href="sgd-1d-bimodality.html">1-D lab</a>
+  · <a href="sgd-2d-bimodality.html">2-D lab</a>
+  · <a href="sgd-2d-matrix-cocycle.html">matrix lab</a>
+  · <a href="nn_checkpoint_lab/nn-checkpoint-cocycle.html">network probe</a>
+</footer>
+</div>
+
+<script>
+window.boot=function(){
+  if(window.__b) return; window.__b=true;
+  if(window.renderMathInElement){
+    renderMathInElement(document.body,{
+      delimiters:[
+        {left:'$$',right:'$$',display:true},
+        {left:'\\[',right:'\\]',display:true},
+        {left:'\\(',right:'\\)',display:false}
+      ],
+      throwOnError:false
+    });
+  }
+  init();
+};
+document.addEventListener('DOMContentLoaded',()=>{ if(window.renderMathInElement) window.boot(); });
+
+function rng32(a){return function(){let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;};}
+function n01(r){let u=0,v=0;while(!u)u=r();while(!v)v=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+const NQ=900;
+const cache=new Map();
+function nodes(law,mu,v){
+  const k=law+'|'+mu.toFixed(4)+'|'+v.toFixed(5);
+  if(cache.has(k)) return cache.get(k);
+  const s=Math.sqrt(Math.max(v,0));
+  let out;
+  if(s===0) out=[[mu,1]];
+  else if(law==='twopoint') out=[[mu-s,0.5],[mu+s,0.5]];
+  else if(law==='uniform'){
+    const a=s*Math.sqrt(3), lo=mu-a, hi=mu+a, d=(hi-lo)/NQ;
+    out=[]; for(let i=0;i<NQ;i++) out.push([lo+(i+.5)*d,1/NQ]);
+  } else {
+    const lo=mu-8*s, hi=mu+8*s, d=(hi-lo)/NQ;
+    out=[]; let t=0;
+    for(let i=0;i<NQ;i++){
+      const h=lo+(i+.5)*d, w=Math.exp(-0.5*((h-mu)/s)**2);
+      out.push([h,w]); t+=w;
+    }
+    out=out.map(([h,w])=>[h,w/t]);
+  }
+  cache.set(k,out); return out;
+}
+function sampleH(law,mu,v,r){
+  const s=Math.sqrt(Math.max(v,0));
+  if(s===0) return mu;
+  if(law==='twopoint') return r()<0.5?mu-s:mu+s;
+  if(law==='uniform'){ const a=s*Math.sqrt(3); return mu-a+2*a*r(); }
+  return mu+s*n01(r);
+}
+function mq(law,mu,v,eta,q){
+  const nd=nodes(law,mu,v); let s=0;
+  for(let i=0;i<nd.length;i++) s+=nd[i][1]*Math.pow(Math.max(Math.abs(1-eta*nd[i][0]),1e-300),q);
+  return s;
+}
+function lyap(law,mu,v,eta){
+  const nd=nodes(law,mu,v); let s=0;
+  for(let i=0;i<nd.length;i++) s+=nd[i][1]*Math.log(Math.abs(1-eta*nd[i][0])+1e-300);
+  return s;
+}
+function bisect(f,lo,hi,it){
+  it=it||60;
+  for(let i=0;i<it;i++){ const m=.5*(lo+hi); if(f(m)<0) lo=m; else hi=m; }
+  return .5*(lo+hi);
+}
+function etaMS(mu,v){ return 2*mu/(mu*mu+v); }
+function etaL(law,mu,v){ return bisect(e=>lyap(law,mu,v,e), 0.2, 4); }
+function kappaOf(law,mu,v,eta){
+  if(lyap(law,mu,v,eta)>=0) return NaN;
+  if(mq(law,mu,v,eta,30)<1) return Infinity;
+  return bisect(k=>mq(law,mu,v,eta,k)-1, 1e-4, 30);
+}
+function etaForK(law,mu,v,target){
+  const hi=bisect(e=>lyap(law,mu,v,e), .2, 4)-1e-3;
+  return bisect(e=>{ const k=kappaOf(law,mu,v,e); return Number.isFinite(k)?target-k:-1; }, .4, hi);
+}
+function fmt(x,d){ d=d==null?2:d; if(x===Infinity) return '∞'; if(!Number.isFinite(x)) return '—'; return x.toFixed(d); }
+
+function css(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function ctxOf(c){
+  const dpr=window.devicePixelRatio||1;
+  const r=c.getBoundingClientRect();
+  const W=Math.max(280,r.width||c.width), H=c.height*(W/c.width);
+  c.width=Math.round(W*dpr); c.height=Math.round(H*dpr);
+  const g=c.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+  return {g,W,H};
+}
+
+const SIG=1;
+
+function runMS(law,mu,v,eta){
+  const steps=220, n=900, r=rng32(1234);
+  const x=new Float64Array(n), ms=new Float64Array(steps+1);
+  for(let t=0;t<steps;t++){
+    let a=0;
+    for(let i=0;i<n;i++){
+      let y=(1-eta*sampleH(law,mu,v,r))*x[i]+eta*SIG*n01(r);
+      if(!Number.isFinite(y)||Math.abs(y)>1e80) y=1e80;
+      x[i]=y; a+=y*y;
+    }
+    ms[t+1]=a/n;
+  }
+  return ms;
+}
+function runHist(law,mu,v,eta){
+  const n=2500, burn=500, keep=80, r=rng32(4242);
+  const x=new Float64Array(n), samp=[];
+  for(let t=0;t<burn+keep;t++){
+    for(let i=0;i<n;i++){
+      let y=(1-eta*sampleH(law,mu,v,r))*x[i]+eta*SIG*n01(r);
+      if(!Number.isFinite(y)) y=0;
+      x[i]=y;
+    }
+    if(t>=burn) for(let i=0;i<n;i+=2) samp.push(x[i]);
+  }
+  return samp;
+}
+
+function plotMS(c, ms, pred, m2){
+  const {g,W,H}=ctxOf(c);
+  const pad={l:48,r:12,t:16,b:28};
+  let lo=Infinity,hi=-Infinity;
+  for(let i=1;i<ms.length;i++) if(ms[i]>0){ lo=Math.min(lo,ms[i]); hi=Math.max(hi,ms[i]); }
+  if(Number.isFinite(pred)){ lo=Math.min(lo,pred); hi=Math.max(hi,pred); }
+  if(!Number.isFinite(lo)) return;
+  let L0=Math.log10(lo)-.2, L1=Math.log10(hi)+.25;
+  if(L1-L0<1){ const mid=(L0+L1)/2; L0=mid-.5; L1=mid+.5; }
+  const X=i=>pad.l+(i/(ms.length-1))*(W-pad.l-pad.r);
+  const Y=y=>pad.t+(1-(Math.log10(y)-L0)/(L1-L0))*(H-pad.t-pad.b);
+  g.strokeStyle=css('--line'); g.beginPath();
+  g.moveTo(pad.l,pad.t); g.lineTo(pad.l,H-pad.b); g.lineTo(W-pad.r,H-pad.b); g.stroke();
+  if(Number.isFinite(pred)&&pred>0){
+    g.setLineDash([5,4]); g.strokeStyle=css('--soft');
+    g.beginPath(); g.moveTo(pad.l,Y(pred)); g.lineTo(W-pad.r,Y(pred)); g.stroke();
+    g.setLineDash([]);
+  }
+  g.strokeStyle=css('--blue'); g.lineWidth=2; g.beginPath();
+  let st=false;
+  for(let i=1;i<ms.length;i++){
+    if(ms[i]<=0) continue;
+    const xx=X(i), yy=Y(ms[i]);
+    if(!st){ g.moveTo(xx,yy); st=true; } else g.lineTo(xx,yy);
+  }
+  g.stroke();
+  g.fillStyle=css('--soft'); g.font='12px ui-sans-serif,system-ui';
+  g.fillText('step t', W/2-16, H-6);
+  g.fillText('average of x²', 8, 12);
+}
+
+function plotMq(c, law, mu, v, eta, kap){
+  const {g,W,H}=ctxOf(c);
+  const pad={l:46,r:14,t:16,b:30};
+  const qMax=4, N=80, vals=[];
+  let yHi=1.4;
+  for(let i=0;i<=N;i++){
+    const q=qMax*i/N, m=mq(law,mu,v,eta,q);
+    vals.push([q,m]); if(Number.isFinite(m)) yHi=Math.max(yHi,Math.min(m,2.6));
+  }
+  const X=q=>pad.l+(q/qMax)*(W-pad.l-pad.r);
+  const Y=m=>pad.t+(1-m/yHi)*(H-pad.t-pad.b);
+  g.strokeStyle=css('--line'); g.beginPath();
+  g.moveTo(pad.l,pad.t); g.lineTo(pad.l,H-pad.b); g.lineTo(W-pad.r,H-pad.b); g.stroke();
+  g.setLineDash([5,4]); g.strokeStyle=css('--red'); g.beginPath();
+  g.moveTo(pad.l,Y(1)); g.lineTo(W-pad.r,Y(1)); g.stroke(); g.setLineDash([]);
+  g.strokeStyle=css('--blue'); g.lineWidth=2.2; g.beginPath();
+  vals.forEach(([q,m],i)=>{ const yy=Y(Math.min(m,yHi)); if(i) g.lineTo(X(q),yy); else g.moveTo(X(q),yy); });
+  g.stroke();
+  if(Number.isFinite(kap)&&kap>0&&kap<qMax){
+    g.strokeStyle=css('--green'); g.setLineDash([3,3]);
+    g.beginPath(); g.moveTo(X(kap),pad.t); g.lineTo(X(kap),H-pad.b); g.stroke(); g.setLineDash([]);
+    g.fillStyle=css('--green'); g.font='13px ui-sans-serif,system-ui';
+    g.fillText('κ = '+fmt(kap,2), Math.min(X(kap)+6, W-70), pad.t+14);
+  }
+  g.fillStyle=css('--soft'); g.font='12px ui-sans-serif,system-ui';
+  g.fillText('moment order q', W/2-40, H-6);
+  for(const q of [0,1,2,3,4]) g.fillText(String(q), X(q)-3, H-pad.b+14);
+  g.fillText('1', 18, Y(1)+4);
+}
+
+function plotHist(c, samp){
+  const {g,W,H}=ctxOf(c);
+  const pad={l:16,r:12,t:10,b:26};
+  const abs=samp.map(Math.abs).sort((a,b)=>a-b);
+  const R=abs[Math.floor(abs.length*0.82)]||1;
+  const nb=80, lo=-R, hi=R, bw=(hi-lo)/nb, cnt=new Float64Array(nb);
+  let tot=0;
+  for(const z of samp){ if(z<lo||z>=hi) continue; cnt[Math.min(nb-1, Math.floor((z-lo)/bw))]++; tot++; }
+  if(!tot) return;
+  const d=new Float64Array(nb);
+  for(let i=0;i<nb;i++) d[i]=cnt[i]/(tot*bw);
+  const sm=new Float64Array(nb);
+  for(let i=0;i<nb;i++) sm[i]=(d[Math.max(0,i-1)]+2*d[i]+d[Math.min(nb-1,i+1)])/4;
+  const yM=Math.max(...sm)*1.12||1;
+  const X=x=>pad.l+((x-lo)/(hi-lo))*(W-pad.l-pad.r);
+  const Y=y=>pad.t+(1-y/yM)*(H-pad.t-pad.b);
+  g.fillStyle='rgba(31,111,210,.35)';
+  for(let i=0;i<nb;i++){
+    const x0=X(lo+i*bw), x1=X(lo+(i+1)*bw);
+    g.fillRect(x0, Y(sm[i]), Math.max(1,x1-x0-.3), H-pad.b-Y(sm[i]));
+  }
+  g.strokeStyle=css('--line'); g.beginPath();
+  g.moveTo(X(0),pad.t); g.lineTo(X(0),H-pad.b); g.stroke();
+  g.fillStyle=css('--soft'); g.font='12px ui-sans-serif,system-ui';
+  g.fillText(fmt(-R,1), pad.l, H-6);
+  g.fillText('0', X(0)-3, H-6);
+  g.fillText(fmt(R,1), W-pad.r-22, H-6);
+  g.fillText('how often x sits here', W/2-60, 12);
+}
+
+function debounce(fn,ms){ let t; return ()=>{ clearTimeout(t); t=setTimeout(fn,ms); }; }
+const $=id=>document.getElementById(id);
+
+function lesson1(){
+  const mu=+$('sMu').value, v=+$('sV').value, eta=+$('sEta').value;
+  $('aMu').textContent=fmt(mu,2);
+  $('aV').textContent=fmt(v,3);
+  $('aEta').textContent=fmt(eta,2);
+  const ems=etaMS(mu,v), m2=mq('gaussian',mu,v,eta,2);
+  const box=$('ans1');
+  if(m2<1){
+    box.className='answer ok';
+    box.innerHTML=`Mean-square <b>stable</b>. The threshold is η<sub>MS</sub> = ${fmt(ems,3)}. Your η = ${fmt(eta,3)} is below it, so the cloud of x stays tight.`;
+  } else {
+    box.className='answer bad';
+    box.innerHTML=`Mean-square <b>unstable</b>. The threshold is η<sub>MS</sub> = ${fmt(ems,3)}. Your η = ${fmt(eta,3)} is above it, so the histogram spreads.`;
+  }
+  plotHist($('c1'), runHist('gaussian',mu,v,eta));
+}
+
+function lesson2(){
+  const mu=+$('sMu').value, v=Math.max(+$('sV').value, 0.002), eta=+$('sEta2').value;
+  $('bEta').textContent=fmt(eta,3);
+  const kap=kappaOf('gaussian',mu,v,eta);
+  const m2=mq('gaussian',mu,v,eta,2);
+  const box=$('ans2');
+  if(!Number.isFinite(kap)){
+    box.className='answer bad';
+    box.textContent='This step size is so large that no moment stays finite.';
+  } else {
+    box.className=kap>=2?'answer ok':(kap>=1?'answer warn':'answer bad');
+    box.innerHTML=`Moments with q &lt; <b>${fmt(kap,2)}</b> stay finite. Moments with q &gt; <b>${fmt(kap,2)}</b> blow up.`
+      +(m2<1?' The square (q = 2) is still OK.':' The square (q = 2) has already blown up.');
+  }
+  plotMq($('c2'),'gaussian',mu,v,eta,kap);
+}
+
+function lesson3(run){
+  const law=$('sLaw').value, mu=+$('sMu').value, v=Math.max(+$('sV').value, 0.002), eta=+$('sEta3').value;
+  $('cEta').textContent=fmt(eta,3);
+  const kap=kappaOf(law,mu,v,eta);
+  const box=$('ans3');
+  let extra='';
+  if(!Number.isFinite(kap)) extra='Past the last linear threshold: this model has no stationary histogram.';
+  else if(kap>2) extra='The tail is light enough that the variance is still finite.';
+  else if(kap>1) extra='Infinite variance, but the mean is still finite.';
+  else extra='Even the mean is infinite. The histogram still exists.';
+  box.className=(!Number.isFinite(kap)||kap<1)?'answer bad':(kap<2?'answer warn':'answer ok');
+  box.innerHTML=`Tail index κ = <b>${fmt(kap,2)}</b>. ${extra}`;
+  if(run){
+    const L=bisect(e=>lyap(law,mu,v,e),.2,4);
+    plotHist($('c3'), runHist(law,mu,v, Math.min(eta, L-0.01)));
+  }
+}
+
+/* ---------- density from edges (NN pack) ---------- */
+function plotDens(c, edges, dens, title){
+  const {g,W,H}=ctxOf(c);
+  const pad={l:16,r:12,t:16,b:26};
+  if(!edges||!dens||!dens.length) return;
+  const lo=edges[0], hi=edges[edges.length-1];
+  let yM=0; for(const v of dens) if(v>yM) yM=v; yM=yM*1.14||1;
+  const X=x=>pad.l+((x-lo)/Math.max(hi-lo,1e-12))*(W-pad.l-pad.r);
+  const Y=y=>pad.t+(1-y/yM)*(H-pad.t-pad.b);
+  g.fillStyle='rgba(31,111,210,.38)';
+  for(let i=0;i<dens.length;i++){
+    const x0=X(edges[i]), x1=X(edges[i+1]??edges[i]);
+    g.fillRect(x0, Y(dens[i]), Math.max(1,x1-x0-.2), H-pad.b-Y(dens[i]));
+  }
+  g.strokeStyle=css('--line'); g.beginPath();
+  g.moveTo(X(0),pad.t); g.lineTo(X(0),H-pad.b); g.stroke();
+  g.fillStyle=css('--soft'); g.font='12px ui-sans-serif,system-ui';
+  g.fillText(title||'', pad.l, 12);
+  g.fillText(fmt(lo,2), pad.l, H-6);
+  g.fillText('0', X(0)-3, H-6);
+  g.fillText(fmt(hi,2), W-pad.r-28, H-6);
+}
+
+/* ---------- Lesson 4: real network pack ---------- */
+let nnPack=null;
+async function loadNN(){
+  if(nnPack) return nnPack;
+  try{
+    const r=await fetch('tutorial-tf2-probe.json');
+    nnPack=await r.json();
+  }catch(e){ nnPack={cells:[]}; }
+  return nnPack;
+}
+function lessonNN(){
+  if(!nnPack||!nnPack.cells||!nnPack.cells.length) return;
+  const i=Math.max(0, Math.min(nnPack.cells.length-1, +$('sNN').value|0));
+  const c=nnPack.cells[i];
+  $('sNN').max=String(nnPack.cells.length-1);
+  $('nnEta').textContent=fmt(c.etalam,2);
+  const chi=c.chi_lin;
+  const box=$('ansNN');
+  if(chi< -0.05){
+    box.className='answer ok';
+    box.innerHTML=`Below Lyapunov. χ<sub>lin</sub> = <b>${fmt(chi,3)}</b> &lt; 0. The projection on u<sub>1</sub> is a tight spike at the checkpoint.`;
+  } else if(chi<0.15){
+    box.className='answer warn';
+    box.innerHTML=`At or just past Lyapunov. χ<sub>lin</sub> = <b>${fmt(chi,3)}</b>. The linear model says “run away”. The network still has a stationary cloud along u<sub>1</sub>.`;
+  } else {
+    box.className='answer bad';
+    box.innerHTML=`Past Lyapunov. χ<sub>lin</sub> = <b>${fmt(chi,3)}</b> &gt; 0. Raising ηλ<sub>1</sub> to ${fmt(c.etalam,2)} opens the two-lobe shape.`;
+  }
+  plotDens($('cNN'), c.marg1.edges, c.marg1.density, 'along the largest eigenvector u₁');
+  const host=$('nnStrip');
+  if(!host.dataset.done){
+    host.dataset.done='1';
+    nnPack.cells.forEach((cell,j)=>{
+      const mini=document.createElement('div'); mini.className='mini';
+      mini.innerHTML=`<p class="ttl">ηλ₁ = <b>${fmt(cell.etalam,2)}</b></p><canvas width="160" height="90"></canvas>`;
+      host.appendChild(mini);
+      plotDens(mini.querySelector('canvas'), cell.marg1.edges, cell.marg1.density, '');
+      mini.style.cursor='pointer';
+      mini.onclick=()=>{ $('sNN').value=String(j); lessonNN(); };
+    });
+  }
+}
+
+/* ---------- 1-D self-stabilizing map ---------- */
+function stepNL(x,h,eta,alpha,beta,sig,r){
+  const x2=x*x, x3=x2*x, x5=x3*x2;
+  let y=(1-eta*h)*x + alpha*x3 - beta*x5;
+  if(sig) y+=sig*n01(r);
+  if(!Number.isFinite(y)||Math.abs(y)>8) y=0.2*(r()-0.5);
+  return y;
+}
+function runNL(eta, npart, steps, burn){
+  const mu=1, v=0.01, alpha=0.775, beta=0.35, sig=0.03;
+  const r=rng32((eta*1000+17)|0);
+  const x=new Float64Array(npart);
+  for(let i=0;i<npart;i++) x[i]=0.2*(r()<.5?-1:1)*(0.2+0.8*r());
+  const samp=[];
+  for(let t=0;t<steps;t++){
+    for(let i=0;i<npart;i++) x[i]=stepNL(x[i], sampleH('gaussian',mu,v,r), eta, alpha, beta, sig, r);
+    if(t>=burn) for(let i=0;i<npart;i+=3) samp.push(x[i]);
+  }
+  return samp;
+}
+function lesson1d(runStrip){
+  const eta=+$('sEta1d').value;
+  $('dEta').textContent=fmt(eta,2);
+  const eMS=etaMS(1,0.01), eL=etaL('gaussian',1,0.01);
+  const box=$('ans1d');
+  if(eta<eMS){ box.className='answer ok'; box.textContent='Below mean-square: a spike at zero. The cubic has nothing to do yet.'; }
+  else if(eta<eL){ box.className='answer warn'; box.textContent='Past mean-square, still below Lyapunov: the linear cloud is already heavy-tailed.'; }
+  else { box.className='answer bad'; box.textContent='Past Lyapunov: the linear model has no stationary law. The cubic / quintic keep a cloud — then two lobes.'; }
+  if(!$('c1d').dataset.skip)
+    plotHist($('c1d'), runNL(eta, 1400, 380, 140));
+  if(runStrip && !$('strip1d').dataset.done){
+    $('strip1d').dataset.done='1';
+    const etas=[1.85, 2.05, 2.20, 2.55];
+    etas.forEach(e=>{
+      const mini=document.createElement('div'); mini.className='mini';
+      const lab=e<eMS?'below MS':(e<eL?'MS–L':'past L');
+      mini.innerHTML=`<p class="ttl">η = <b>${fmt(e,2)}</b> · ${lab}</p><canvas width="160" height="90"></canvas>`;
+      $('strip1d').appendChild(mini);
+      plotHist(mini.querySelector('canvas'), runNL(e, 900, 280, 100));
+    });
+  }
+}
+
+/* ---------- 2-D sharp–tangent ---------- */
+function run2d(eta){
+  const muZ=1,vZ=0.0025,muY=1.14,vY=0.0025,beta=0.3,c4z=-0.75,c6z=6,c4y=-0.87,c6y=6,sz=0.01,sy=0.01;
+  const n=700, steps=320, burn=120, r=rng32(99+(eta*100)|0);
+  let z=new Float64Array(n), y=new Float64Array(n);
+  const zs=[], ys=[];
+  const c4z6=c4z/6, c6z120=c6z/120, c4y6=c4y/6, c6y120=c6y/120;
+  for(let t=0;t<steps;t++){
+    for(let i=0;i<n;i++){
+      const hz=sampleH('gaussian',muZ,vZ,r), hy=sampleH('gaussian',muY,vY,r);
+      const zi=z[i], yi=y[i];
+      let dz=eta*((hz+2*beta*yi)*zi + c4z6*zi*zi*zi + c6z120*zi*zi*zi*zi*zi);
+      let dy=eta*(hy*yi + beta*zi*zi + c4y6*yi*yi*yi + c6y120*yi*yi*yi*yi*yi);
+      let zn=zi-dz+sz*n01(r), yn=yi-dy+sy*n01(r);
+      if(!Number.isFinite(zn)||Math.abs(zn)>6) zn=0.1*(r()-0.5);
+      if(!Number.isFinite(yn)||Math.abs(yn)>6) yn=0.1*(r()-0.5);
+      z[i]=zn; y[i]=yn;
+    }
+    if(t>=burn){ for(let i=0;i<n;i+=2){ zs.push(z[i]); ys.push(y[i]); } }
+  }
+  return {zs,ys};
+}
+function plotCloud(c, zs, ys){
+  const {g,W,H}=ctxOf(c);
+  const pad={l:28,r:10,t:14,b:24};
+  let R=0.8;
+  for(let i=0;i<zs.length;i++) R=Math.max(R, Math.abs(zs[i]), Math.abs(ys[i]));
+  R=Math.min(R*1.1, 3.5);
+  const X=x=>pad.l+((x+R)/(2*R))*(W-pad.l-pad.r);
+  const Y=y=>pad.t+(1-(y+R)/(2*R))*(H-pad.t-pad.b);
+  g.strokeStyle=css('--line'); g.beginPath();
+  g.moveTo(X(-R),Y(0)); g.lineTo(X(R),Y(0));
+  g.moveTo(X(0),Y(-R)); g.lineTo(X(0),Y(R)); g.stroke();
+  g.fillStyle='rgba(31,111,210,.22)';
+  const n=Math.min(zs.length, 1800);
+  for(let i=0;i<n;i++) g.fillRect(X(zs[i])-1, Y(ys[i])-1, 2, 2);
+  g.fillStyle=css('--soft'); g.font='12px ui-sans-serif,system-ui';
+  g.fillText('z  (sharp)', W/2-20, H-6);
+  g.fillText('y', 6, 14);
+}
+function lesson2d(){
+  const eta=+$('sEta2d').value;
+  $('eEta').textContent=fmt(eta,2);
+  const box=$('ans2d');
+  if(eta<2.05){ box.className='answer ok'; box.textContent='Below the edge: one blob at the origin.'; }
+  else { box.className='answer bad'; box.textContent='Past Lyapunov on the sharp axis: two lobes in z, tangent y stays slaved near zero.'; }
+  const {zs,ys}=run2d(eta);
+  plotCloud($('c2d'), zs, ys);
+  plotHist($('c2dz'), zs);
+}
+
+/* ---------- Lesson 6: inverse moments ---------- */
+function plotMqBoth(c, law, mu, v, eta){
+  const {g,W,H}=ctxOf(c);
+  const pad={l:46,r:14,t:16,b:30};
+  const qMin=-1.2, qMax=3, N=90, vals=[];
+  let yHi=2.2;
+  for(let i=0;i<=N;i++){
+    const q=qMin+(qMax-qMin)*i/N;
+    const m=mq(law,mu,v,eta,q);
+    vals.push([q,m]);
+    if(Number.isFinite(m)&&m<20) yHi=Math.max(yHi, Math.min(m, 3.2));
+  }
+  const X=q=>pad.l+((q-qMin)/(qMax-qMin))*(W-pad.l-pad.r);
+  const Y=m=>pad.t+(1-Math.min(m,yHi)/yHi)*(H-pad.t-pad.b);
+  g.strokeStyle=css('--line'); g.beginPath();
+  g.moveTo(pad.l,pad.t); g.lineTo(pad.l,H-pad.b); g.lineTo(W-pad.r,H-pad.b); g.stroke();
+  g.setLineDash([5,4]); g.strokeStyle=css('--red');
+  g.beginPath(); g.moveTo(pad.l,Y(1)); g.lineTo(W-pad.r,Y(1)); g.stroke();
+  g.strokeStyle=css('--line');
+  g.beginPath(); g.moveTo(X(0),pad.t); g.lineTo(X(0),H-pad.b); g.stroke(); g.setLineDash([]);
+  g.strokeStyle=css('--blue'); g.lineWidth=2.1; g.beginPath();
+  let st=false;
+  vals.forEach(([q,m])=>{
+    if(!Number.isFinite(m)||m>8){ st=false; return; }
+    const xx=X(q), yy=Y(m);
+    if(!st){ g.moveTo(xx,yy); st=true; } else g.lineTo(xx,yy);
+  });
+  g.stroke();
+  g.fillStyle=css('--soft'); g.font='12px ui-sans-serif,system-ui';
+  g.fillText('q  (negative ←   → positive)', W/2-70, H-6);
+  for(const q of [-1,0,1,2,3]) g.fillText(String(q), X(q)-4, H-pad.b+14);
+  g.fillText('1', 18, Y(1)+4);
+  g.fillStyle=css('--amber');
+  g.fillText('harmonic q = −1', X(-1)+6, pad.t+14);
+}
+function lessonH(){
+  const eta=+$('sEtaH').value, law=$('sLawH').value, mu=1, v=0.04;
+  $('fEta').textContent=fmt(eta,3);
+  const m2=mq(law,mu,v,eta,2), lam=lyap(law,mu,v,eta);
+  const mh=mq(law,mu,v,eta,-1);
+  const mhalf=mq(law,mu,v,eta,-0.5);
+  const box=$('ansH');
+  const harmOk=Number.isFinite(mh)&&mh<1e6;
+  let bits=[];
+  bits.push(m2<1?'mean-square: stable':'mean-square: already gone');
+  bits.push(lam<0?'Lyapunov: still contracting':'Lyapunov: expanding');
+  bits.push(mhalf<1?'negative ½: stable':'negative ½: gone');
+  bits.push(harmOk?(mh<1?'harmonic: stable':'harmonic: gone'):'harmonic: undefined (gain can be 0)');
+  box.className=lam<0?'answer ok':(mhalf<1?'answer warn':'answer bad');
+  box.innerHTML=bits.join(' · ');
+  plotMqBoth($('cH'), law, mu, v, eta);
+}
+
+function init(){
+  const d1=debounce(lesson1,90);
+  ['sMu','sV','sEta'].forEach(id=>{
+    $(id).addEventListener('input',()=>{ lesson1(); lesson2(); });
+    $(id).addEventListener('change',()=>{ lesson1(); lesson2(); });
+  });
+  $('sEta').addEventListener('input',d1);
+  $('btnBelow').onclick=()=>{
+    const mu=+$('sMu').value,v=+$('sV').value;
+    $('sEta').value=String(Math.max(0.4, etaMS(mu,v)-0.04)); lesson1();
+  };
+  $('btnAbove').onclick=()=>{
+    const mu=+$('sMu').value,v=+$('sV').value;
+    $('sEta').value=String(etaMS(mu,v)+0.04); lesson1();
+  };
+  $('btnRun1').onclick=lesson1;
+
+  const d2=debounce(lesson2,80);
+  $('sEta2').addEventListener('input',()=>{ $('bEta').textContent=fmt(+$('sEta2').value,3); d2(); });
+  $('sEta2').addEventListener('change',lesson2);
+  $('btnMS').onclick=()=>{ $('sEta2').value=String(etaMS(+$('sMu').value,+$('sV').value)); lesson2(); };
+  $('btnMean').onclick=()=>{ $('sEta2').value=String((2/(+$('sMu').value)).toFixed(3)); lesson2(); };
+
+  const d3=debounce(()=>lesson3(true),120);
+  $('sEta3').addEventListener('input',()=>{ $('cEta').textContent=fmt(+$('sEta3').value,3); lesson3(false); d3(); });
+  $('sLaw').addEventListener('change',()=>lesson3(true));
+  $('btnRun3').onclick=()=>lesson3(true);
+  $('btnK2').onclick=()=>{
+    $('sEta3').value=String(etaForK($('sLaw').value,+$('sMu').value,Math.max(+$('sV').value,.002),2));
+    lesson3(true);
+  };
+  $('btnK1').onclick=()=>{
+    $('sEta3').value=String(etaForK($('sLaw').value,+$('sMu').value,Math.max(+$('sV').value,.002),1));
+    lesson3(true);
+  };
+
+  lesson1();
+  lesson2();
+  lesson3(true);
+
+  /* lesson 4 — real network, load when in view */
+  $('sNN').addEventListener('input', lessonNN);
+  $('btnNNpre').onclick=()=>{ $('sNN').value='0'; lessonNN(); };
+  $('btnNNL').onclick=()=>{ $('sNN').value='3'; lessonNN(); };
+  $('btnNNbim').onclick=()=>{ $('sNN').value='6'; lessonNN(); };
+  const bootNN=()=>{ loadNN().then(lessonNN); };
+  if('IntersectionObserver' in window){
+    const io=new IntersectionObserver(es=>{
+      if(es.some(e=>e.isIntersecting)){ io.disconnect(); bootNN(); }
+    },{rootMargin:'200px'});
+    io.observe($('l4'));
+  } else bootNN();
+
+  /* lesson 5 */
+  const d1d=debounce(()=>lesson1d(false),120);
+  $('sEta1d').addEventListener('input',()=>{ $('dEta').textContent=fmt(+$('sEta1d').value,2); d1d(); });
+  $('btn1dRun').onclick=()=>lesson1d(true);
+  $('btn1dMS').onclick=()=>{ $('sEta1d').value='1.90'; lesson1d(false); };
+  $('btn1dL').onclick=()=>{ $('sEta1d').value=String(etaL('gaussian',1,0.01).toFixed(2)); lesson1d(false); };
+  $('btn1dB').onclick=()=>{ $('sEta1d').value='2.55'; lesson1d(false); };
+  const d2d=debounce(lesson2d,140);
+  $('sEta2d').addEventListener('input',()=>{ $('eEta').textContent=fmt(+$('sEta2d').value,2); d2d(); });
+  $('btn2dRun').onclick=lesson2d;
+  $('btn2dPre').onclick=()=>{ $('sEta2d').value='1.85'; lesson2d(); };
+  $('btn2dBim').onclick=()=>{ $('sEta2d').value='2.50'; lesson2d(); };
+  if('IntersectionObserver' in window){
+    const io5=new IntersectionObserver(es=>{
+      if(es.some(e=>e.isIntersecting)){ io5.disconnect(); lesson1d(true); lesson2d(); }
+    },{rootMargin:'160px'});
+    io5.observe($('l5'));
+  } else { lesson1d(true); lesson2d(); }
+
+  /* lesson 6 */
+  const dH=debounce(lessonH,80);
+  $('sEtaH').addEventListener('input',()=>{ $('fEta').textContent=fmt(+$('sEtaH').value,3); dH(); });
+  $('sLawH').addEventListener('change',lessonH);
+  if('IntersectionObserver' in window){
+    const io6=new IntersectionObserver(es=>{
+      if(es.some(e=>e.isIntersecting)){ io6.disconnect(); lessonH(); }
+    },{rootMargin:'160px'});
+    io6.observe($('l6'));
+  } else lessonH();
+}
+</script>
+</body>
+</html>
