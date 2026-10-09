@@ -146,6 +146,10 @@ summary {
   margin: 16px 0 0;
 }
 
+.seminar-line {
+  margin: 16px 0 8px;
+}
+
 .job-market mark {
   background: #e8c56a;
   color: #16120a;
