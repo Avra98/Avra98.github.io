@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Avrajit Ghosh - optimization, implicit regularization, and deep learning theory.">
   <title>Avrajit Ghosh</title>
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
   <main class="page">
@@ -119,15 +119,21 @@
             <p class="venue">ICLR 2025</p>
             <p class="paper-links"><a href="https://arxiv.org/abs/2502.20531">arXiv</a> <span>|</span> <a href="https://www.mis.mpg.de/events/event/the-effect-of-low-rank-and-stochasticity-on-gradient-descent-at-the-edge-of-stability">Seminar talk at MPI-MIS</a></p>
           </div>
-          <div class="paper-figures">
-            <figure>
-              <img class="paper-figure" src="assets/dln-train-loss.gif" alt="Training loss across learning rates.">
-              <figcaption>Training loss</figcaption>
-            </figure>
-            <figure>
-              <img class="paper-figure" src="assets/dln-end-to-end.gif" alt="End-to-end singular values across learning rates.">
-              <figcaption>End-to-end singular values</figcaption>
-            </figure>
+          <div class="paper-figures step-slider" data-lrs="0.029,0.0295,0.0299,0.03,0.031,0.03115,0.0312,0.0315,0.032,0.035,0.036,0.037,0.039,0.041,0.042">
+            <div class="paper-figures-row">
+              <figure>
+                <img class="paper-figure" data-kind="train" src="assets/dln/train_0.029.png" alt="Training loss at the selected step size.">
+                <figcaption>Training loss</figcaption>
+              </figure>
+              <figure>
+                <img class="paper-figure" data-kind="e2e" src="assets/dln/e2e_0.029.png" alt="End-to-end singular values at the selected step size.">
+                <figcaption>End-to-end singular values</figcaption>
+              </figure>
+            </div>
+            <label class="step-control">
+              <span>Step size &eta; = <output>0.029</output></span>
+              <input type="range" min="0" max="14" step="1" value="0" aria-label="Step size">
+            </label>
           </div>
         </article>
       </details>
@@ -217,5 +223,19 @@
     </section>
 
   </main>
+  <script>
+    document.querySelectorAll('.step-slider').forEach((box) => {
+      const lrs = box.dataset.lrs.split(',');
+      const input = box.querySelector('input');
+      const out = box.querySelector('output');
+      const imgs = box.querySelectorAll('img[data-kind]');
+      lrs.forEach((lr) => imgs.forEach((img) => { new Image().src = `assets/dln/${img.dataset.kind}_${lr}.png`; }));
+      input.addEventListener('input', () => {
+        const lr = lrs[input.value];
+        out.textContent = lr;
+        imgs.forEach((img) => { img.src = `assets/dln/${img.dataset.kind}_${lr}.png`; });
+      });
+    });
+  </script>
 </body>
 </html>
