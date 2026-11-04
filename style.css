@@ -231,21 +231,24 @@ summary {
 
 
 .paper.has-figure {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 48%);
-  gap: 8px 18px;
+  display: flex;
+  flex-direction: row;
   align-items: center;
+  gap: 16px;
 }
 
 .paper-copy {
+  flex: 1 1 auto;
   min-width: 0;
 }
 
 .paper-figure {
-  width: 100%;
+  flex: 0 0 220px;
+  width: 220px;
+  max-width: 220px;
   height: auto;
   display: block;
-  border-radius: 8px;
+  border-radius: 6px;
   background: #f7f4ee;
 }
 
@@ -348,8 +351,5 @@ footer {
     order: -1;
   }
 
-  .paper.has-figure {
-    grid-template-columns: 1fr;
-  }
 }
 
