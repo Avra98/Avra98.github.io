@@ -233,13 +233,34 @@ summary {
 .paper.has-figure {
   display: flex;
   flex-direction: row;
-  align-items: center;
+  align-items: flex-start;
   gap: 16px;
 }
 
 .paper-copy {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+
+.paper-figures {
+  flex: 0 0 220px;
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.paper-figures figure {
+  margin: 0;
+}
+
+.paper-figures figcaption {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.2;
+  text-align: center;
 }
 
 .paper-figure {
