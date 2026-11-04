@@ -244,11 +244,12 @@ summary {
 
 
 .paper-figures {
-  flex: 0 0 220px;
-  width: 220px;
+  flex: 0 0 auto;
+  width: auto;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
 }
 
 .paper-figures figure {
@@ -273,10 +274,16 @@ summary {
   background: #f7f4ee;
 }
 
+.paper-figures .paper-figure {
+  flex: 0 0 210px;
+  width: 210px;
+  max-width: 210px;
+}
+
 .paper-figure-lg {
-  flex-basis: 380px;
-  width: 380px;
-  max-width: 42%;
+  flex-basis: 460px;
+  width: 460px;
+  max-width: 50%;
 }
 
 .paper.representative {
