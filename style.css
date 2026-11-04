@@ -237,6 +237,10 @@ summary {
   gap: 18px;
 }
 
+.paper.has-figure:not(.representative) {
+  padding-right: 17px;
+}
+
 .paper-copy {
   flex: 1 1 auto;
   min-width: 0;
@@ -244,8 +248,9 @@ summary {
 
 
 .paper-figures {
-  flex: 0 0 480px;
-  width: 480px;
+  flex: 0 0 440px;
+  width: 440px;
+  max-width: 48%;
 }
 
 .paper-figures-row {
@@ -303,9 +308,20 @@ summary {
 }
 
 .paper-figure-lg {
-  flex-basis: 380px;
-  width: 380px;
-  max-width: 42%;
+  flex-basis: 440px;
+  width: 440px;
+  max-width: 48%;
+}
+
+a.paper-figure-link {
+  flex: 0 0 440px;
+  width: 440px;
+  max-width: 48%;
+}
+
+a.paper-figure-link .paper-figure {
+  width: 100%;
+  max-width: none;
 }
 
 .paper.representative {
