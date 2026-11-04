@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Avrajit Ghosh - optimization, implicit regularization, and deep learning theory.">
   <title>Avrajit Ghosh</title>
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
   <main class="page">
@@ -106,11 +106,14 @@
           </div>
           <img class="paper-figure paper-figure-lg" src="assets/atc-curriculum.gif?v=2" alt="Abstract Token Curriculum: growing the curriculum one thought at a time.">
         </article>
-        <article class="paper">
-          <h4>Variational Learning Finds Flatter Solutions at the Edge of Stability</h4>
-          <p class="authors"><b class="me" style="font-weight:900; color:#ffffff;">Avrajit Ghosh</b>, Bai Cong, Rio Yokota, Saiprasad Ravishankar, Rongrong Wang, Molei Tao, Mohammad Emtiyaz Khan, Thomas Möllenhoff</p>
-          <p class="venue">NeurIPS 2025, Spotlight, Top 3.1%</p>
-          <p class="paper-links"><a href="https://arxiv.org/abs/2506.12903">arXiv</a></p>
+        <article class="paper has-figure">
+          <div class="paper-copy">
+            <h4>Variational Learning Finds Flatter Solutions at the Edge of Stability</h4>
+            <p class="authors"><b class="me" style="font-weight:900; color:#ffffff;">Avrajit Ghosh</b>, Bai Cong, Rio Yokota, Saiprasad Ravishankar, Rongrong Wang, Molei Tao, Mohammad Emtiyaz Khan, Thomas Möllenhoff</p>
+            <p class="venue">NeurIPS 2025, Spotlight, Top 3.1%</p>
+            <p class="paper-links"><a href="https://arxiv.org/abs/2506.12903">arXiv</a></p>
+          </div>
+          <a class="paper-figure-link" href="assets/variational-flat-minima.png" target="_blank" rel="noopener"><img class="paper-figure" src="assets/variational-flat-minima.png" alt="Sharp posterior finds the sharp minimum; flat posterior finds the flatter minimum."></a>
         </article>
         <article class="paper has-figure">
           <div class="paper-copy">
@@ -150,11 +153,14 @@
           </div>
           <a class="paper-figure-link" href="assets/hard-labels-trajectory.gif" target="_blank" rel="noopener"><img class="paper-figure" src="assets/hard-labels-trajectory.gif" alt="Training loss, validation loss, and active/inactive norm trajectory for single-layer and spindle models."></a>
         </article>
-        <article class="paper">
-          <h4>Implicit Regularization in Heavy-ball Momentum Accelerated Stochastic Gradient Descent</h4>
-          <p class="authors"><b class="me" style="font-weight:900; color:#ffffff;">Avrajit Ghosh*</b>, He Lyu*, Xitong Zhang, Rongrong Wang</p>
-          <p class="venue">ICLR 2023, Spotlight, Top 5%</p>
-          <p class="paper-links"><a href="https://arxiv.org/abs/2302.00849">arXiv</a> <span>|</span> <a href="https://iclr.cc/virtual/2023/session/13364">ICLR oral talk</a></p>
+        <article class="paper has-figure">
+          <div class="paper-copy">
+            <h4>Implicit Regularization in Heavy-ball Momentum Accelerated Stochastic Gradient Descent</h4>
+            <p class="authors"><b class="me" style="font-weight:900; color:#ffffff;">Avrajit Ghosh*</b>, He Lyu*, Xitong Zhang, Rongrong Wang</p>
+            <p class="venue">ICLR 2023, Spotlight, Top 5%</p>
+            <p class="paper-links"><a href="https://arxiv.org/abs/2302.00849">arXiv</a> <span>|</span> <a href="https://iclr.cc/virtual/2023/session/13364">ICLR oral talk</a></p>
+          </div>
+          <a class="paper-figure-link" href="assets/momentum-igr.jpg" target="_blank" rel="noopener"><img class="paper-figure" src="assets/momentum-igr.jpg" alt="Implicit gradient regularization for SGD, GD, and their heavy-ball momentum variants."></a>
         </article>
         <article class="paper">
           <h4>Improving Generalization of Complex Models with Unbounded Loss Using PAC-Bayes Bounds</h4>
@@ -233,11 +239,17 @@
       const out = box.querySelector('output');
       const imgs = box.querySelectorAll('img[data-kind]');
       lrs.forEach((lr) => imgs.forEach((img) => { new Image().src = `assets/dln/${img.dataset.kind}_${lr}.png`; }));
-      input.addEventListener('input', () => {
-        const lr = lrs[input.value];
-        out.textContent = lr;
-        imgs.forEach((img) => { img.src = `assets/dln/${img.dataset.kind}_${lr}.png`; });
-      });
+      const show = (i) => {
+        input.value = i;
+        out.textContent = lrs[i];
+        imgs.forEach((img) => { img.src = `assets/dln/${img.dataset.kind}_${lrs[i]}.png`; });
+      };
+      let resumeAt = 0;
+      input.addEventListener('input', () => { show(Number(input.value)); resumeAt = Date.now() + 4000; });
+      setInterval(() => {
+        if (Date.now() < resumeAt) return;
+        show((Number(input.value) + 1) % lrs.length);
+      }, 900);
     });
   </script>
 </body>
