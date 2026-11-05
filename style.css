@@ -224,7 +224,7 @@ summary {
 }
 
 .paper {
-  margin: 16px 0 18px;
+  margin: 26px 0 28px;
   padding-left: 16px;
   border-left: 2px solid rgba(201, 150, 69, 0.38);
 }
@@ -234,7 +234,7 @@ summary {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 18px;
+  gap: 26px;
 }
 
 .paper.has-figure:not(.representative) {
